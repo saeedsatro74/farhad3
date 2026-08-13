@@ -10,12 +10,22 @@ import {
   AlertCircle,
   Plus,
   Crop,
+  Layers,
+  Sparkles,
+  FolderPlus,
+  RotateCcw,
 } from 'lucide-react';
 import { ImageCropModal } from './ImageCropModal';
 
 interface ImageUploaderProps {
   images: ImageItem[];
-  onAddImages: (files: FileList | File[], replaceExisting?: boolean) => void;
+  cumulativeCount: number;
+  totalDailyImages: number;
+  completedBatches: number;
+  startNumber: number;
+  prefix: string;
+  onAddImages: (files: FileList | File[], mode: 'append' | 'new_batch') => void;
+  onStartNewProject: () => void;
   onRemoveImage: (id: string) => void;
   onReorderImage: (fromIndex: number, toIndex: number) => void;
   onUpdateImage: (id: string, newPreviewUrl: string, cropSettings?: CropSettings) => void;
@@ -26,7 +36,13 @@ interface ImageUploaderProps {
 
 export const ImageUploader: React.FC<ImageUploaderProps> = ({
   images,
+  cumulativeCount,
+  totalDailyImages,
+  completedBatches,
+  startNumber,
+  prefix,
   onAddImages,
+  onStartNewProject,
   onRemoveImage,
   onReorderImage,
   onUpdateImage,
@@ -35,7 +51,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   columns,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const newBatchInputRef = useRef<HTMLInputElement>(null);
+  const appendInputRef = useRef<HTMLInputElement>(null);
+
   const [isDragging, setIsDragging] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
@@ -43,11 +61,12 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   const totalPages = Math.ceil(images.length / itemsPerPage) || 0;
   const isSampleList = images.length > 0 && images.every((img) => img.isSample);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, replace = false) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, mode: 'append' | 'new_batch') => {
     if (e.target.files && e.target.files.length > 0) {
-      onAddImages(e.target.files, replace);
+      onAddImages(e.target.files, mode);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      if (replaceInputRef.current) replaceInputRef.current.value = '';
+      if (newBatchInputRef.current) newBatchInputRef.current.value = '';
+      if (appendInputRef.current) appendInputRef.current.value = '';
     }
   };
 
@@ -64,31 +83,39 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      onAddImages(e.dataTransfer.files, isSampleList);
+      onAddImages(e.dataTransfer.files, isSampleList ? 'new_batch' : 'append');
     }
   };
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 space-y-5">
-      {/* Hidden file inputs */}
+      {/* Hidden file inputs for different upload modes */}
       <input
         type="file"
         ref={fileInputRef}
-        onChange={(e) => handleFileChange(e, isSampleList)}
+        onChange={(e) => handleFileChange(e, isSampleList ? 'new_batch' : 'append')}
         multiple
         accept="image/*"
         className="hidden"
       />
       <input
         type="file"
-        ref={replaceInputRef}
-        onChange={(e) => handleFileChange(e, true)}
+        ref={newBatchInputRef}
+        onChange={(e) => handleFileChange(e, 'new_batch')}
+        multiple
+        accept="image/*"
+        className="hidden"
+      />
+      <input
+        type="file"
+        ref={appendInputRef}
+        onChange={(e) => handleFileChange(e, 'append')}
         multiple
         accept="image/*"
         className="hidden"
       />
 
-      {/* Header */}
+      {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
         <div>
           <div className="flex items-center gap-2">
@@ -98,33 +125,36 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             </h2>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            تصاویر دلخواه خود را آپلود کنید تا در شبکه A4 چیده شوند.
+            تصاویر را سری به سری آپلود کنید تا در بوم A4 چیده شوند. لیست فقط سری جاری را نشان می‌دهد.
           </p>
         </div>
 
-        {images.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
-            {!isSampleList && (
-              <button
-                type="button"
-                onClick={() => replaceInputRef.current?.click()}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 px-3 py-1.5 rounded-lg border border-teal-200 transition-colors cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                جایگزینی با تصاویر جدید
-              </button>
-            )}
-
+        {/* Action Toolbars */}
+        <div className="flex flex-wrap items-center gap-2">
+          {images.length > 0 && !isSampleList && (
             <button
               type="button"
-              onClick={onClearAll}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg border border-rose-200 transition-colors cursor-pointer"
+              onClick={() => newBatchInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 px-3.5 py-2 rounded-xl shadow-xs transition-all transform active:scale-95 cursor-pointer"
+              title="بارگذاری سری جدید تصاویر (سری قبلی در آمار کل ثبت می‌شود و شماره‌گذاری ادامه می‌یابد)"
             >
-              <Trash2 className="w-3.5 h-3.5" />
-              حذف همه ({images.length})
+              <FolderPlus className="w-4 h-4 text-emerald-200" />
+              ➕ بارگذاری سری جدید ({images.length} عکس بعدی)
             </button>
-          </div>
-        )}
+          )}
+
+          {images.length > 0 && (
+            <button
+              type="button"
+              onClick={onStartNewProject}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-2 rounded-xl border border-rose-200 transition-colors cursor-pointer"
+              title="شروع پروژه جدید از صفر و پاکسازی تمامی آمار روزانه"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+              پروژه جدید (صفر کردن آمار)
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Sample Images Warning Banner */}
@@ -133,12 +163,12 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           <div className="flex items-center gap-2 font-medium">
             <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
             <span>
-              تصاویر نمونه روی صفحه قرار دارند. با انتخاب یا کشیدن فایل‌های خودتان، این تصاویر نمونه به‌طور خودکار پاک خواهند شد.
+              تصاویر نمونه روی صفحه قرار دارند. با آپلود عکس‌های جدید، تصاویر نمونه پاک خواهند شد.
             </span>
           </div>
           <button
             type="button"
-            onClick={() => replaceInputRef.current?.click()}
+            onClick={() => newBatchInputRef.current?.click()}
             className="shrink-0 bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-1 rounded-lg text-xs transition-colors cursor-pointer"
           >
             آپلود عکس‌های من
@@ -152,54 +182,96 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
-        className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
+        className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all ${
           isDragging
             ? 'border-teal-500 bg-teal-50/50 scale-[0.99]'
             : 'border-slate-300 hover:border-teal-400 bg-slate-50/50 hover:bg-teal-50/30'
         }`}
       >
         <div className="flex flex-col items-center justify-center gap-2">
-          <div className="w-12 h-12 rounded-full bg-teal-100/70 text-teal-600 flex items-center justify-center">
-            <ImageIcon className="w-6 h-6" />
+          <div className="w-11 h-11 rounded-full bg-teal-100/70 text-teal-600 flex items-center justify-center">
+            <ImageIcon className="w-5 h-5" />
           </div>
           <div className="text-sm font-bold text-slate-800">
-            تصاویر را اینجا بکشید و رها کنید یا{' '}
+            تصاویر سری جدید را اینجا بکشید و رها کنید یا{' '}
             <span className="text-teal-600 underline">انتخاب فایل</span>
           </div>
           <p className="text-xs text-slate-500">
-            فرمت‌های پشتیبانی شده: JPG, PNG, WEBP, GIF (امکان انتخاب چندتایی)
+            پشتیبانی از انواع فرمت‌های تصویر (JPG, PNG, WEBP) • انتخاب دسته‌جمعی تصاویر
           </p>
         </div>
       </div>
 
-      {/* Stats Summary Badges */}
-      {images.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 rounded-xl p-3 border border-slate-200 text-xs text-slate-700">
-          <div className="flex items-center gap-2 font-medium">
-            <span className="flex items-center gap-1 bg-white px-2.5 py-1 rounded-md border border-slate-200 text-teal-700 font-bold">
-              <ImageIcon className="w-3.5 h-3.5 text-teal-600" />
-              تعداد تصاویر: {images.length.toLocaleString('fa-IR')}
-            </span>
-            <span className="flex items-center gap-1 bg-white px-2.5 py-1 rounded-md border border-slate-200 text-amber-700 font-bold">
-              <FileText className="w-3.5 h-3.5 text-amber-600" />
-              تعداد صفحات A4: {totalPages.toLocaleString('fa-IR')}
+      {/* Comprehensive Daily & Batch Statistics Banner */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-xl p-3.5 text-white shadow-sm border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Cumulative Total Badge */}
+          <div className="flex items-center gap-1.5 bg-amber-500/20 text-amber-300 px-3 py-1.5 rounded-lg border border-amber-500/30 font-bold">
+            <Layers className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>آمار کل تصاویر امروز/پروژه:</span>
+            <span className="text-sm font-black text-amber-200 font-mono">
+              {totalDailyImages.toLocaleString('fa-IR')} عکس
             </span>
           </div>
-          <div className="text-slate-500 text-[11px]">
-            ظرفیت هر صفحه: {itemsPerPage} تصویر ({rows} سطر × {columns} ستون)
+
+          {/* Active Batch Badge */}
+          <div className="flex items-center gap-1.5 bg-teal-500/20 text-teal-300 px-3 py-1.5 rounded-lg border border-teal-500/30 font-bold">
+            <ImageIcon className="w-4 h-4 text-teal-400 shrink-0" />
+            <span>سری جاری:</span>
+            <span className="text-sm font-black text-teal-200 font-mono">
+              {images.length.toLocaleString('fa-IR')} عکس
+            </span>
+          </div>
+
+          {/* Active Range Numbering Badge */}
+          <div className="flex items-center gap-1 bg-indigo-500/20 text-indigo-200 px-3 py-1.5 rounded-lg border border-indigo-500/30 font-medium">
+            <span>شماره‌گذاری فعال:</span>
+            <span className="font-bold text-amber-300 font-btitr">
+              {prefix || ''}{startNumber}
+            </span>
+            {images.length > 0 && (
+              <span>
+                تا {prefix || ''}{startNumber + Math.max(0, totalPages - 1)}
+              </span>
+            )}
           </div>
         </div>
-      )}
+
+        {/* Action Controls inside Stats Banner */}
+        {images.length > 0 && !isSampleList && (
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => appendInputRef.current?.click()}
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-lg border border-slate-700 transition-colors cursor-pointer"
+            >
+              <Plus className="w-3 h-3 text-teal-400" />
+              افزودن به همین سری
+            </button>
+            <button
+              type="button"
+              onClick={onClearAll}
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-300 hover:text-rose-100 bg-rose-950/60 hover:bg-rose-900/80 px-2.5 py-1 rounded-lg border border-rose-800/80 transition-colors cursor-pointer"
+              title="حذف فقط همین ۱۶ عکس سری جاری"
+            >
+              <RotateCcw className="w-3 h-3" />
+              پاکسازی سری جاری
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Thumbnails Grid */}
       {images.length > 0 ? (
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
-            <span>لیست تصاویر بارگذاری شده:</span>
-            <span>برای تغییر اولویت چیدمان از کلیدهای جهت‌نما استفاده کنید</span>
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
+            <span>لیست تصاویر بارگذاری شده سری جاری ({images.length} عکس):</span>
+            <span className="text-slate-500 text-[11px]">
+              برای تغییر اولویت چیدمان از کلیدهای جهت‌نما استفاده کنید
+            </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 max-h-80 overflow-y-auto p-1 border border-slate-200 rounded-xl bg-slate-50/50">
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 max-h-80 overflow-y-auto p-1.5 border border-slate-200 rounded-xl bg-slate-50/50">
             {images.map((img, index) => {
               const pageNumber = Math.floor(index / itemsPerPage) + 1;
               return (
@@ -229,7 +301,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                       #{index + 1}
                     </span>
                     {/* Page Badge */}
-                    <span className="absolute bottom-1 left-1 bg-teal-600/90 text-white text-[9px] px-1 py-0.5 rounded-md">
+                    <span className="absolute bottom-1 left-1 bg-teal-600/90 text-white text-[9px] px-1 py-0.5 rounded-md font-semibold">
                       ص {pageNumber}
                     </span>
                   </div>
@@ -287,14 +359,22 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           </div>
         </div>
       ) : (
-        <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-          <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+        <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-2">
+          <AlertCircle className="w-8 h-8 text-slate-300 mx-auto" />
           <p className="text-xs font-semibold text-slate-600">
-            هنوز تصویری آپلود نشده است
+            لیست تصاویر سری جاری خالی است
           </p>
-          <p className="text-[11px] text-slate-400 mt-1">
-            تصاویر مورد نظر خود را آپلود کنید تا خروجی چیدمان A4 ساخته شود
+          <p className="text-[11px] text-slate-400">
+            برای ادامه کار، فایل‌های سری جدید را آپلود کنید
           </p>
+          <button
+            type="button"
+            onClick={() => newBatchInputRef.current?.click()}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 px-4 py-2 rounded-xl transition-colors cursor-pointer mt-1"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            بارگذاری تصاویر سری جدید
+          </button>
         </div>
       )}
 

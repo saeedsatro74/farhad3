@@ -27,11 +27,13 @@ import {
 interface LivePreviewProps {
   settings: LayoutSettings;
   images: ImageItem[];
+  totalDailyImages?: number;
 }
 
 export const LivePreview: React.FC<LivePreviewProps> = ({
   settings,
   images,
+  totalDailyImages = 0,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 

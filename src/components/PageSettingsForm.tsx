@@ -24,12 +24,16 @@ interface PageSettingsFormProps {
   settings: LayoutSettings;
   onChange: (updated: LayoutSettings) => void;
   imageCount: number;
+  totalDailyImages?: number;
+  cumulativeCount?: number;
 }
 
 export const PageSettingsForm: React.FC<PageSettingsFormProps> = ({
   settings,
   onChange,
   imageCount,
+  totalDailyImages = 0,
+  cumulativeCount = 0,
 }) => {
   const [activeSection, setActiveSection] = useState<
     'page' | 'margins' | 'border' | 'numbering' | 'all'

@@ -13,6 +13,7 @@ interface CustomFreeformCropperProps {
   onChangeCropRect: (newRect: CropRect) => void;
   rotation: number;
   flip: { horizontal: boolean; vertical: boolean };
+  zoomScale?: number;
 }
 
 type HandleType =
@@ -33,14 +34,77 @@ export const CustomFreeformCropper: React.FC<CustomFreeformCropperProps> = ({
   onChangeCropRect,
   rotation,
   flip,
+  zoomScale = 1.0,
 }) => {
+  const workspaceRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const [imgNaturalSize, setImgNaturalSize] = useState<{ width: number; height: number } | null>(null);
+  const [displayedSize, setDisplayedSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+
   const [activeHandle, setActiveHandle] = useState<HandleType>(null);
   const dragStartRef = useRef<{
     mouseX: number;
     mouseY: number;
     rect: CropRect;
   } | null>(null);
+
+  // Load natural image size
+  useEffect(() => {
+    let isMounted = true;
+    const img = new Image();
+    img.onload = () => {
+      if (isMounted) {
+        setImgNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
+      }
+    };
+    img.src = imageSrc;
+    return () => {
+      isMounted = false;
+    };
+  }, [imageSrc]);
+
+  // Recalculate displayed size to fit exact image aspect ratio inside workspace
+  const updateDisplayedSize = useCallback(() => {
+    if (!workspaceRef.current || !imgNaturalSize) return;
+
+    const padding = 32;
+    const wsWidth = workspaceRef.current.clientWidth - padding;
+    const wsHeight = workspaceRef.current.clientHeight - padding;
+
+    if (wsWidth <= 0 || wsHeight <= 0) return;
+
+    const isRotatedVertically = (Math.abs(rotation) % 180) !== 0;
+    const imgW = isRotatedVertically ? imgNaturalSize.height : imgNaturalSize.width;
+    const imgH = isRotatedVertically ? imgNaturalSize.width : imgNaturalSize.height;
+
+    const aspect = imgW / imgH;
+    let targetW = wsWidth;
+    let targetH = wsWidth / aspect;
+
+    if (targetH > wsHeight) {
+      targetH = wsHeight;
+      targetW = wsHeight * aspect;
+    }
+
+    setDisplayedSize({
+      width: Math.max(40, targetW),
+      height: Math.max(40, targetH),
+    });
+  }, [imgNaturalSize, rotation]);
+
+  useEffect(() => {
+    updateDisplayedSize();
+  }, [updateDisplayedSize]);
+
+  useEffect(() => {
+    if (!workspaceRef.current) return;
+    const observer = new ResizeObserver(() => {
+      updateDisplayedSize();
+    });
+    observer.observe(workspaceRef.current);
+    return () => observer.disconnect();
+  }, [updateDisplayedSize]);
 
   const handleStart = (
     e: React.MouseEvent | React.TouchEvent,
@@ -193,116 +257,105 @@ export const CustomFreeformCropper: React.FC<CustomFreeformCropperProps> = ({
     };
   }, [activeHandle, handleMove, handleEnd]);
 
-  const isRotatedVertically = (Math.abs(rotation) % 180) !== 0;
-
   const transformStyle = {
-    transform: `rotate(${rotation}deg) scale(${flip.horizontal ? -1 : 1}, ${flip.vertical ? -1 : 1})`,
+    transform: `scale(${zoomScale}) rotate(${rotation}deg) scale(${flip.horizontal ? -1 : 1}, ${flip.vertical ? -1 : 1})`,
+    transition: activeHandle ? 'none' : 'transform 0.15s ease-out',
   };
 
   return (
-    <div className="relative w-full h-full flex items-center justify-center p-3 sm:p-5 bg-slate-950 select-none overflow-hidden">
-      <div
-        ref={containerRef}
-        className="relative max-w-full max-h-full inline-flex items-center justify-center"
-        style={{
-          ...transformStyle,
-          maxHeight: isRotatedVertically ? '75%' : '100%',
-          maxWidth: isRotatedVertically ? '75%' : '100%',
-        }}
-      >
-        {/* Base Image */}
-        <img
-          src={imageSrc}
-          alt="Cropper target"
-          className="max-w-full max-h-[calc(100vh-320px)] sm:max-h-[480px] w-auto h-auto object-contain pointer-events-none block rounded-xs shadow-xl"
-          style={{
-            maxHeight: '100%',
-            maxWidth: '100%',
-          }}
-        />
-
-        {/* Dark Overlay over non-selected area */}
-        <div className="absolute inset-0 bg-black/60 pointer-events-none" />
-
-        {/* Active Crop Box Window */}
+    <div
+      ref={workspaceRef}
+      className="relative w-full h-full min-h-0 min-w-0 flex items-center justify-center p-4 bg-slate-950 select-none overflow-hidden"
+    >
+      {displayedSize.width > 0 && displayedSize.height > 0 && (
         <div
-          className="absolute border-2 border-white shadow-2xl cursor-move z-20 group"
+          ref={containerRef}
+          className="relative shadow-2xl transition-transform duration-100 shrink-0"
           style={{
-            left: `${cropRect.x}%`,
-            top: `${cropRect.y}%`,
-            width: `${cropRect.width}%`,
-            height: `${cropRect.height}%`,
-            boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.65)',
+            width: `${displayedSize.width}px`,
+            height: `${displayedSize.height}px`,
+            ...transformStyle,
           }}
-          onMouseDown={(e) => handleStart(e, 'move')}
-          onTouchStart={(e) => handleStart(e, 'move')}
         >
-          {/* Inner Grid Guidelines (Rule of thirds) */}
-          <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none opacity-40">
-            <div className="border-r border-b border-white/60" />
-            <div className="border-r border-b border-white/60" />
-            <div className="border-b border-white/60" />
-            <div className="border-r border-b border-white/60" />
-            <div className="border-r border-b border-white/60" />
-            <div className="border-b border-white/60" />
-            <div className="border-r border-white/60" />
-            <div className="border-r border-white/60" />
-            <div />
+          {/* Base Image */}
+          <img
+            src={imageSrc}
+            alt="Cropper target"
+            className="w-full h-full object-fill pointer-events-none block rounded-xs"
+          />
+
+          {/* Active Crop Box Window */}
+          <div
+            className="absolute border-2 border-amber-400 cursor-move z-20 group"
+            style={{
+              left: `${cropRect.x}%`,
+              top: `${cropRect.y}%`,
+              width: `${cropRect.width}%`,
+              height: `${cropRect.height}%`,
+              boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.65)',
+            }}
+            onMouseDown={(e) => handleStart(e, 'move')}
+            onTouchStart={(e) => handleStart(e, 'move')}
+          >
+            {/* Inner Grid Guidelines (Rule of thirds) */}
+            <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none opacity-40">
+              <div className="border-r border-b border-white/60" />
+              <div className="border-r border-b border-white/60" />
+              <div className="border-b border-white/60" />
+              <div className="border-r border-b border-white/60" />
+              <div className="border-r border-b border-white/60" />
+              <div className="border-b border-white/60" />
+              <div className="border-r border-white/60" />
+              <div className="border-r border-white/60" />
+              <div />
+            </div>
+
+            {/* Corner Handles */}
+            <div
+              className="absolute -top-2 -left-2 w-6 h-6 border-t-4 border-l-4 border-amber-400 bg-white shadow-lg cursor-nwse-resize z-30 rounded-tl-xs hover:scale-125 transition-transform"
+              onMouseDown={(e) => handleStart(e, 'top-left')}
+              onTouchStart={(e) => handleStart(e, 'top-left')}
+            />
+            <div
+              className="absolute -top-2 -right-2 w-6 h-6 border-t-4 border-r-4 border-amber-400 bg-white shadow-lg cursor-nesw-resize z-30 rounded-tr-xs hover:scale-125 transition-transform"
+              onMouseDown={(e) => handleStart(e, 'top-right')}
+              onTouchStart={(e) => handleStart(e, 'top-right')}
+            />
+            <div
+              className="absolute -bottom-2 -left-2 w-6 h-6 border-b-4 border-l-4 border-amber-400 bg-white shadow-lg cursor-nesw-resize z-30 rounded-bl-xs hover:scale-125 transition-transform"
+              onMouseDown={(e) => handleStart(e, 'bottom-left')}
+              onTouchStart={(e) => handleStart(e, 'bottom-left')}
+            />
+            <div
+              className="absolute -bottom-2 -right-2 w-6 h-6 border-b-4 border-r-4 border-amber-400 bg-white shadow-lg cursor-nwse-resize z-30 rounded-br-xs hover:scale-125 transition-transform"
+              onMouseDown={(e) => handleStart(e, 'bottom-right')}
+              onTouchStart={(e) => handleStart(e, 'bottom-right')}
+            />
+
+            {/* Edge Handles */}
+            <div
+              className="absolute -top-2 left-1/2 -translate-x-1/2 w-10 h-3.5 bg-amber-400 border border-white rounded-xs shadow-md cursor-ns-resize z-30 hover:scale-110 transition-transform"
+              onMouseDown={(e) => handleStart(e, 'top')}
+              onTouchStart={(e) => handleStart(e, 'top')}
+            />
+            <div
+              className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-10 h-3.5 bg-amber-400 border border-white rounded-xs shadow-md cursor-ns-resize z-30 hover:scale-110 transition-transform"
+              onMouseDown={(e) => handleStart(e, 'bottom')}
+              onTouchStart={(e) => handleStart(e, 'bottom')}
+            />
+            <div
+              className="absolute top-1/2 -left-2 -translate-y-1/2 h-10 w-3.5 bg-amber-400 border border-white rounded-xs shadow-md cursor-ew-resize z-30 hover:scale-110 transition-transform"
+              onMouseDown={(e) => handleStart(e, 'left')}
+              onTouchStart={(e) => handleStart(e, 'left')}
+            />
+            <div
+              className="absolute top-1/2 -right-2 -translate-y-1/2 h-10 w-3.5 bg-amber-400 border border-white rounded-xs shadow-md cursor-ew-resize z-30 hover:scale-110 transition-transform"
+              onMouseDown={(e) => handleStart(e, 'right')}
+              onTouchStart={(e) => handleStart(e, 'right')}
+            />
           </div>
-
-          {/* Corner Handles (Large Thick White Corners like Snipping Tool) */}
-          {/* Top Left Corner */}
-          <div
-            className="absolute -top-1.5 -left-1.5 w-5 h-5 border-t-4 border-l-4 border-amber-400 bg-white shadow-md cursor-nwse-resize z-30"
-            onMouseDown={(e) => handleStart(e, 'top-left')}
-            onTouchStart={(e) => handleStart(e, 'top-left')}
-          />
-          {/* Top Right Corner */}
-          <div
-            className="absolute -top-1.5 -right-1.5 w-5 h-5 border-t-4 border-r-4 border-amber-400 bg-white shadow-md cursor-nesw-resize z-30"
-            onMouseDown={(e) => handleStart(e, 'top-right')}
-            onTouchStart={(e) => handleStart(e, 'top-right')}
-          />
-          {/* Bottom Left Corner */}
-          <div
-            className="absolute -bottom-1.5 -left-1.5 w-5 h-5 border-b-4 border-l-4 border-amber-400 bg-white shadow-md cursor-nesw-resize z-30"
-            onMouseDown={(e) => handleStart(e, 'bottom-left')}
-            onTouchStart={(e) => handleStart(e, 'bottom-left')}
-          />
-          {/* Bottom Right Corner */}
-          <div
-            className="absolute -bottom-1.5 -right-1.5 w-5 h-5 border-b-4 border-r-4 border-amber-400 bg-white shadow-md cursor-nwse-resize z-30"
-            onMouseDown={(e) => handleStart(e, 'bottom-right')}
-            onTouchStart={(e) => handleStart(e, 'bottom-right')}
-          />
-
-          {/* Edge Handles */}
-          {/* Top Edge */}
-          <div
-            className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-8 h-3 bg-amber-400 border border-white rounded-xs shadow-md cursor-ns-resize z-30"
-            onMouseDown={(e) => handleStart(e, 'top')}
-            onTouchStart={(e) => handleStart(e, 'top')}
-          />
-          {/* Bottom Edge */}
-          <div
-            className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-8 h-3 bg-amber-400 border border-white rounded-xs shadow-md cursor-ns-resize z-30"
-            onMouseDown={(e) => handleStart(e, 'bottom')}
-            onTouchStart={(e) => handleStart(e, 'bottom')}
-          />
-          {/* Left Edge */}
-          <div
-            className="absolute top-1/2 -left-1.5 -translate-y-1/2 h-8 w-3 bg-amber-400 border border-white rounded-xs shadow-md cursor-ew-resize z-30"
-            onMouseDown={(e) => handleStart(e, 'left')}
-            onTouchStart={(e) => handleStart(e, 'left')}
-          />
-          {/* Right Edge */}
-          <div
-            className="absolute top-1/2 -right-1.5 -translate-y-1/2 h-8 w-3 bg-amber-400 border border-white rounded-xs shadow-md cursor-ew-resize z-30"
-            onMouseDown={(e) => handleStart(e, 'right')}
-            onTouchStart={(e) => handleStart(e, 'right')}
-          />
         </div>
-      </div>
+      )}
     </div>
   );
 };

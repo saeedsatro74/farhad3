@@ -40,6 +40,10 @@ export default function App() {
   const [settings, setSettings] = useState<LayoutSettings>(INITIAL_SETTINGS);
   const [images, setImages] = useState<ImageItem[]>([]);
 
+  // Daily / Session Cumulative Statistics
+  const [cumulativeCount, setCumulativeCount] = useState<number>(0);
+  const [completedBatches, setCompletedBatches] = useState<number>(0);
+
   // Automatically load 16 sample images on first mount so user sees live output immediately
   useEffect(() => {
     let mounted = true;
@@ -53,8 +57,11 @@ export default function App() {
     };
   }, []);
 
-  // Handle uploading files and automatically calculate smart grid layout
-  const handleAddImages = async (files: FileList | File[], replaceExisting = false) => {
+  // Handle adding images (either append to current batch, or load as a NEW batch continuing numbering)
+  const handleAddImages = async (
+    files: FileList | File[],
+    mode: 'append' | 'new_batch' = 'append'
+  ) => {
     const fileArray = Array.from(files);
     if (fileArray.length === 0) return;
 
@@ -70,14 +77,43 @@ export default function App() {
     });
 
     const isAllSamples = images.length > 0 && images.every((item) => item.isSample);
+
     let updatedImages: ImageItem[];
 
-    if (replaceExisting || isAllSamples || images.length === 0) {
-      images.forEach((item) => {
-        if (item.previewUrl.startsWith('blob:')) {
-          URL.revokeObjectURL(item.previewUrl);
-        }
-      });
+    if (mode === 'new_batch' || isAllSamples) {
+      // Archive previous real images count
+      if (!isAllSamples && images.length > 0) {
+        const prevBatchCount = images.length;
+        const itemsPerPage = Math.max(1, settings.page.rows * settings.page.columns);
+        const prevPages = Math.max(1, Math.ceil(prevBatchCount / itemsPerPage));
+
+        setCumulativeCount((prev) => prev + prevBatchCount);
+        setCompletedBatches((prev) => prev + 1);
+
+        // Advance start number to continue numbering seamlessly
+        setSettings((current) => ({
+          ...current,
+          numbering: {
+            ...current.numbering,
+            startNumber: current.numbering.startNumber + prevPages,
+          },
+        }));
+
+        // Clean up previous blob URLs
+        images.forEach((item) => {
+          if (item.previewUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(item.previewUrl);
+          }
+        });
+      } else {
+        // Replacing sample images on first real upload
+        images.forEach((item) => {
+          if (item.previewUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(item.previewUrl);
+          }
+        });
+      }
+
       updatedImages = newItems;
     } else {
       updatedImages = [...images, ...newItems];
@@ -85,7 +121,7 @@ export default function App() {
 
     setImages(updatedImages);
 
-    // Automatically adjust layout to smart grid based on total count
+    // Automatically adjust layout to smart grid based on active batch count
     const smart = calculateSmartLayout(updatedImages.length);
     setSettings((current) => ({
       ...current,
@@ -94,6 +130,34 @@ export default function App() {
         orientation: smart.orientation,
         rows: smart.rows,
         columns: smart.columns,
+      },
+    }));
+  };
+
+  // Start a completely fresh project (Clear daily stats and all active images)
+  const handleStartNewProject = () => {
+    const isAllSamples = images.length > 0 && images.every((item) => item.isSample);
+    
+    if (!isAllSamples && (images.length > 0 || cumulativeCount > 0)) {
+      if (!window.confirm('آیا از شروع پروژه جدید و صفر کردن آمار کل اطمینان دارید؟ تمامی تصاویر بارگذاری شده و آمار پاک خواهند شد.')) {
+        return;
+      }
+    }
+
+    images.forEach((item) => {
+      if (item.previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(item.previewUrl);
+      }
+    });
+
+    setImages([]);
+    setCumulativeCount(0);
+    setCompletedBatches(0);
+    setSettings((prev) => ({
+      ...prev,
+      numbering: {
+        ...prev.numbering,
+        startNumber: 1,
       },
     }));
   };
@@ -148,8 +212,8 @@ export default function App() {
     );
   };
 
-  // Clear all images
-  const handleClearAll = () => {
+  // Clear current active batch
+  const handleClearCurrentBatch = () => {
     images.forEach((item) => {
       if (item.previewUrl.startsWith('blob:')) {
         URL.revokeObjectURL(item.previewUrl);
@@ -179,13 +243,19 @@ export default function App() {
     }));
   };
 
+  const isAllSamples = images.length > 0 && images.every((item) => item.isSample);
+  const totalDailyImages = cumulativeCount + (isAllSamples ? 0 : images.length);
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-['Vazirmatn',tahoma,sans-serif]" dir="rtl">
       {/* Top Navbar */}
       <Header
         onReset={handleResetSettings}
         onLoadSamples={handleLoadSamples}
+        onStartNewProject={handleStartNewProject}
         hasImages={images.length > 0}
+        totalDailyImages={totalDailyImages}
+        completedBatches={completedBatches}
       />
 
       {/* Main Content Area */}
@@ -195,11 +265,17 @@ export default function App() {
         <div className="w-full">
           <ImageUploader
             images={images}
+            cumulativeCount={cumulativeCount}
+            totalDailyImages={totalDailyImages}
+            completedBatches={completedBatches}
+            startNumber={settings.numbering.startNumber}
+            prefix={settings.numbering.prefix}
             onAddImages={handleAddImages}
+            onStartNewProject={handleStartNewProject}
             onRemoveImage={handleRemoveImage}
             onReorderImage={handleReorderImage}
             onUpdateImage={handleUpdateImage}
-            onClearAll={handleClearAll}
+            onClearAll={handleClearCurrentBatch}
             rows={settings.page.rows}
             columns={settings.page.columns}
           />
@@ -214,12 +290,18 @@ export default function App() {
               settings={settings}
               onChange={(updated) => setSettings(updated)}
               imageCount={images.length}
+              totalDailyImages={totalDailyImages}
+              cumulativeCount={cumulativeCount}
             />
           </div>
 
           {/* Live Preview & Output Panel (7 cols) */}
           <div className="lg:col-span-7 space-y-6 sticky top-20">
-            <LivePreview settings={settings} images={images} />
+            <LivePreview
+              settings={settings}
+              images={images}
+              totalDailyImages={totalDailyImages}
+            />
           </div>
         </div>
       </main>

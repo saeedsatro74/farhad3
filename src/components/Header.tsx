@@ -1,13 +1,23 @@
 import React from 'react';
-import { Camera, Sparkles, RefreshCw, Film } from 'lucide-react';
+import { Camera, Sparkles, RefreshCw, Film, Trash2, Layers } from 'lucide-react';
 
 interface HeaderProps {
   onReset: () => void;
   onLoadSamples: () => void;
+  onStartNewProject: () => void;
   hasImages: boolean;
+  totalDailyImages: number;
+  completedBatches: number;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onReset, onLoadSamples, hasImages }) => {
+export const Header: React.FC<HeaderProps> = ({
+  onReset,
+  onLoadSamples,
+  onStartNewProject,
+  hasImages,
+  totalDailyImages,
+  completedBatches,
+}) => {
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -45,27 +55,47 @@ export const Header: React.FC<HeaderProps> = ({ onReset, onLoadSamples, hasImage
           </div>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+        {/* Action Controls & Daily Stats */}
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+          
+          {/* Daily Cumulative Stats Counter */}
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 text-amber-400 text-xs font-bold border border-slate-800 shadow-2xs">
+            <Layers className="w-3.5 h-3.5 text-teal-400" />
+            <span>آمار کل پروژه/امروز: {totalDailyImages.toLocaleString('fa-IR')} عکس</span>
+            {completedBatches > 0 && (
+              <span className="bg-slate-800 text-slate-300 text-[10px] px-1.5 py-0.2 rounded-md font-normal">
+                ({completedBatches.toLocaleString('fa-IR')} سری)
+              </span>
+            )}
+          </div>
+
           {!hasImages && (
             <button
               onClick={onLoadSamples}
               className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 transition-all cursor-pointer shadow-2xs"
             >
               <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-              تست با تصاویر نمونه
+              تصاویر نمونه
             </button>
           )}
 
           <button
             onClick={onReset}
             className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer"
-            title="بازنشانی تنظیمات اولیه"
+            title="بازنشانی تنظیمات قالب"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            بازنشانی
+            تنظیمات
           </button>
 
+          <button
+            onClick={onStartNewProject}
+            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer shadow-2xs"
+            title="حذف و صفر کردن آمار روزانه جهت شروع پروژه جدید"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+            پروژه جدید (صفر کردن)
+          </button>
         </div>
       </div>
     </header>
