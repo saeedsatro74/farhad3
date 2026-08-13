@@ -193,22 +193,32 @@ export const CustomFreeformCropper: React.FC<CustomFreeformCropperProps> = ({
     };
   }, [activeHandle, handleMove, handleEnd]);
 
+  const isRotatedVertically = (Math.abs(rotation) % 180) !== 0;
+
   const transformStyle = {
     transform: `rotate(${rotation}deg) scale(${flip.horizontal ? -1 : 1}, ${flip.vertical ? -1 : 1})`,
   };
 
   return (
-    <div className="relative w-full h-full flex items-center justify-center p-4 bg-slate-950 select-none overflow-hidden">
+    <div className="relative w-full h-full flex items-center justify-center p-3 sm:p-5 bg-slate-950 select-none overflow-hidden">
       <div
         ref={containerRef}
-        className="relative max-w-full max-h-full inline-block"
-        style={transformStyle}
+        className="relative max-w-full max-h-full inline-flex items-center justify-center"
+        style={{
+          ...transformStyle,
+          maxHeight: isRotatedVertically ? '75%' : '100%',
+          maxWidth: isRotatedVertically ? '75%' : '100%',
+        }}
       >
         {/* Base Image */}
         <img
           src={imageSrc}
           alt="Cropper target"
-          className="max-h-[460px] sm:max-h-[520px] w-auto h-auto object-contain pointer-events-none block rounded-xs shadow-xl"
+          className="max-w-full max-h-[calc(100vh-320px)] sm:max-h-[480px] w-auto h-auto object-contain pointer-events-none block rounded-xs shadow-xl"
+          style={{
+            maxHeight: '100%',
+            maxWidth: '100%',
+          }}
         />
 
         {/* Dark Overlay over non-selected area */}

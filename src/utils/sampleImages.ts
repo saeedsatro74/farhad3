@@ -52,6 +52,7 @@ export async function generateSampleImages(count = 16): Promise<ImageItem[]> {
       id: `sample-${i + 1}-${Date.now()}`,
       file,
       previewUrl: dataUrl,
+      originalUrl: dataUrl,
       name: `عکس نمونه ${i + 1}`,
       isSample: true,
     });

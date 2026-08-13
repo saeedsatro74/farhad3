@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutSettings, ImageItem } from './types';
+import { LayoutSettings, ImageItem, CropSettings } from './types';
 import { Header } from './components/Header';
 import { PageSettingsForm } from './components/PageSettingsForm';
 import { ImageUploader } from './components/ImageUploader';
@@ -64,6 +64,7 @@ export default function App() {
         id: `${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
         file,
         previewUrl,
+        originalUrl: previewUrl,
         name: file.name,
       };
     });
@@ -130,17 +131,16 @@ export default function App() {
   };
 
   // Update image with newly cropped data URL
-  const handleUpdateImage = (id: string, newPreviewUrl: string) => {
+  const handleUpdateImage = (id: string, newPreviewUrl: string, cropSettings?: CropSettings) => {
     setImages((prev) =>
       prev.map((item) => {
         if (item.id === id) {
-          if (item.previewUrl.startsWith('blob:')) {
-            URL.revokeObjectURL(item.previewUrl);
-          }
+          const originalUrl = item.originalUrl || item.previewUrl;
           return {
             ...item,
-            file: undefined, // now using cropped data URL
             previewUrl: newPreviewUrl,
+            originalUrl,
+            cropSettings: cropSettings || item.cropSettings,
           };
         }
         return item;

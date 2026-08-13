@@ -39,13 +39,21 @@ export interface LayoutSettings {
   numbering: NumberingConfig;
 }
 
+export interface CropSettings {
+  cropRect: { x: number; y: number; width: number; height: number };
+  rotation: number;
+  flip: { horizontal: boolean; vertical: boolean };
+}
+
 export interface ImageItem {
   id: string;
   file?: File;
   previewUrl: string;
+  originalUrl?: string;
   name: string;
   isSample?: boolean;
   span?: number; // 1 = 1 column, 2 = 2 columns (double width), 3 = 3 columns, 4 = 4 columns (quadruple width)
+  cropSettings?: CropSettings;
 }
 
 export interface GeneratedPageResult {

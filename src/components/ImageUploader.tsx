@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { ImageItem } from '../types';
+import { ImageItem, CropSettings } from '../types';
 import {
   Upload,
   Image as ImageIcon,
@@ -18,7 +18,7 @@ interface ImageUploaderProps {
   onAddImages: (files: FileList | File[], replaceExisting?: boolean) => void;
   onRemoveImage: (id: string) => void;
   onReorderImage: (fromIndex: number, toIndex: number) => void;
-  onUpdateImage: (id: string, newPreviewUrl: string) => void;
+  onUpdateImage: (id: string, newPreviewUrl: string, cropSettings?: CropSettings) => void;
   onClearAll: () => void;
   rows: number;
   columns: number;
@@ -305,8 +305,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           currentIndex={editingIndex}
           isOpen={editingIndex !== null}
           onClose={() => setEditingIndex(null)}
-          onSaveCurrentImage={(id, croppedDataUrl) => {
-            onUpdateImage(id, croppedDataUrl);
+          onSaveCurrentImage={(id, croppedDataUrl, cropSettings) => {
+            onUpdateImage(id, croppedDataUrl, cropSettings);
           }}
           onNavigateIndex={(newIndex) => {
             setEditingIndex(newIndex);

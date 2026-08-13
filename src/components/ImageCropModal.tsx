@@ -13,7 +13,7 @@ import {
   ArrowLeft,
   CornerDownLeft,
 } from 'lucide-react';
-import { ImageItem } from '../types';
+import { ImageItem, CropSettings } from '../types';
 import { CustomFreeformCropper, CropRect } from './CustomFreeformCropper';
 
 interface ImageCropModalProps {
@@ -21,7 +21,7 @@ interface ImageCropModalProps {
   currentIndex: number;
   isOpen: boolean;
   onClose: () => void;
-  onSaveCurrentImage: (id: string, croppedDataUrl: string) => void;
+  onSaveCurrentImage: (id: string, croppedDataUrl: string, cropSettings?: CropSettings) => void;
   onNavigateIndex: (newIndex: number) => void;
 }
 
@@ -136,27 +136,40 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
   const [showSavedToast, setShowSavedToast] = useState(false);
 
   const currentImage = images[currentIndex];
+  const baseImageSrc = currentImage?.originalUrl || currentImage?.previewUrl || '';
 
-  // Reset crop settings when switching active image
+  // Initialize/Restore crop settings when switching active image
   useEffect(() => {
-    setCropRect({ x: 0, y: 0, width: 100, height: 100 });
-    setRotation(0);
-    setFlip({ horizontal: false, vertical: false });
+    if (!currentImage) return;
+    if (currentImage.cropSettings) {
+      setCropRect(currentImage.cropSettings.cropRect);
+      setRotation(currentImage.cropSettings.rotation);
+      setFlip(currentImage.cropSettings.flip);
+    } else {
+      setCropRect({ x: 0, y: 0, width: 100, height: 100 });
+      setRotation(0);
+      setFlip({ horizontal: false, vertical: false });
+    }
     setShowSavedToast(false);
-  }, [currentIndex]);
+  }, [currentIndex, currentImage]);
 
-  // Save changes ONLY (does NOT close modal)
+  // Save changes ONLY (does NOT close modal and preserves exact crop rectangle)
   const handleSaveOnly = useCallback(async () => {
     if (!currentImage || isSaving) return;
     try {
       setIsSaving(true);
+      const sourceUrl = currentImage.originalUrl || currentImage.previewUrl;
       const croppedImage = await getCroppedImgFreeform(
-        currentImage.previewUrl,
+        sourceUrl,
         cropRect,
         rotation,
         flip
       );
-      onSaveCurrentImage(currentImage.id, croppedImage);
+      onSaveCurrentImage(currentImage.id, croppedImage, {
+        cropRect,
+        rotation,
+        flip,
+      });
       setShowSavedToast(true);
       setTimeout(() => setShowSavedToast(false), 2200);
     } catch (e) {
@@ -170,13 +183,18 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
     if (!currentImage || isSaving) return;
     try {
       setIsSaving(true);
+      const sourceUrl = currentImage.originalUrl || currentImage.previewUrl;
       const croppedImage = await getCroppedImgFreeform(
-        currentImage.previewUrl,
+        sourceUrl,
         cropRect,
         rotation,
         flip
       );
-      onSaveCurrentImage(currentImage.id, croppedImage);
+      onSaveCurrentImage(currentImage.id, croppedImage, {
+        cropRect,
+        rotation,
+        flip,
+      });
       onClose();
     } catch (e) {
       console.error('Error cropping image', e);
@@ -193,13 +211,18 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
 
       try {
         setIsSaving(true);
+        const sourceUrl = currentImage.originalUrl || currentImage.previewUrl;
         const croppedImage = await getCroppedImgFreeform(
-          currentImage.previewUrl,
+          sourceUrl,
           cropRect,
           rotation,
           flip
         );
-        onSaveCurrentImage(currentImage.id, croppedImage);
+        onSaveCurrentImage(currentImage.id, croppedImage, {
+          cropRect,
+          rotation,
+          flip,
+        });
         onNavigateIndex(targetIndex);
       } catch (e) {
         console.error('Error cropping image', e);
@@ -256,9 +279,20 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
   if (!isOpen || !currentImage) return null;
 
   const handleReset = () => {
-    setCropRect({ x: 0, y: 0, width: 100, height: 100 });
-    setRotation(0);
-    setFlip({ horizontal: false, vertical: false });
+    const defaultRect = { x: 0, y: 0, width: 100, height: 100 };
+    const defaultRot = 0;
+    const defaultFlip = { horizontal: false, vertical: false };
+    setCropRect(defaultRect);
+    setRotation(defaultRot);
+    setFlip(defaultFlip);
+    if (currentImage) {
+      const sourceUrl = currentImage.originalUrl || currentImage.previewUrl;
+      onSaveCurrentImage(currentImage.id, sourceUrl, {
+        cropRect: defaultRect,
+        rotation: defaultRot,
+        flip: defaultFlip,
+      });
+    }
   };
 
   return (
@@ -340,7 +374,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
         </div>
 
         {/* Freeform Cropper Area */}
-        <div className="relative w-full h-[480px] sm:h-[540px] bg-slate-950 flex items-center justify-center">
+        <div className="relative w-full flex-1 min-h-[360px] h-[52vh] sm:h-[58vh] max-h-[560px] bg-slate-950 flex items-center justify-center overflow-hidden">
           {showSavedToast && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg flex items-center gap-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
               <Check className="w-4 h-4 text-emerald-200" />
@@ -349,7 +383,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
           )}
 
           <CustomFreeformCropper
-            imageSrc={currentImage.previewUrl}
+            imageSrc={baseImageSrc}
             cropRect={cropRect}
             onChangeCropRect={setCropRect}
             rotation={rotation}
