@@ -341,6 +341,8 @@ export default function App() {
               settings={settings}
               images={images}
               totalDailyImages={totalDailyImages}
+              completedBatches={completedBatches}
+              cumulativeCount={cumulativeCount}
               onCompleteBatch={handleCompleteCurrentBatch}
               onStartNewProject={handleStartNewProject}
             />

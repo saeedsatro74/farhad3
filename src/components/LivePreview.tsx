@@ -28,6 +28,8 @@ interface LivePreviewProps {
   settings: LayoutSettings;
   images: ImageItem[];
   totalDailyImages?: number;
+  completedBatches?: number;
+  cumulativeCount?: number;
   onCompleteBatch?: () => void;
   onStartNewProject?: () => void;
 }
@@ -36,6 +38,8 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
   settings,
   images,
   totalDailyImages = 0,
+  completedBatches = 0,
+  cumulativeCount = 0,
   onCompleteBatch,
   onStartNewProject,
 }) => {
@@ -330,7 +334,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
       </div>
 
       {/* ========================================================= */}
-      {/* STATS SUMMARY BOX (باکس آمار کلی پایان کار و وضعیت خروجی) */}
+      {/* STATS SUMMARY BOX (باکس آمار روزانه تصاویر و خروجی پروژه) */}
       {/* ========================================================= */}
       <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 rounded-2xl p-5 text-white shadow-xl border border-slate-800 space-y-4">
         {/* Box Header */}
@@ -341,14 +345,14 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <span>آمار و گزارش کلی پروژه خروجی</span>
+                <span>آمار روزانه تصاویر و گزارش کلی پروژه</span>
                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
                   <ShieldCheck className="w-3 h-3 text-emerald-400" />
                   حجم خروجی زیر ۵۰۰KB
                 </span>
               </h3>
               <p className="text-xs text-slate-400">
-                خلاصه وضعیت عکس‌های ورودی، صفحات تولید شده و کیفیت خروجی A4
+                گزارش کل تصاویر پردازش شده امروز، سری‌های تکمیل شده و مشخصات خروجی A4
               </p>
             </div>
           </div>
@@ -361,25 +365,25 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {/* Stat 1: Total Uploaded Photos */}
-          <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60 flex flex-col justify-between space-y-1">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span>عکس‌های ارسال شده</span>
+          {/* Stat 1: Total Daily Images Processed */}
+          <div className="bg-gradient-to-br from-teal-950/40 to-slate-800/80 rounded-xl p-3 border border-teal-800/40 flex flex-col justify-between space-y-1">
+            <div className="flex items-center justify-between text-teal-300 text-xs font-semibold">
+              <span>تصاویر تولیدی امروز</span>
               <FileImage className="w-4 h-4 text-teal-400" />
             </div>
-            <div className="text-xl font-extrabold text-white font-mono">
-              {images.length}{' '}
-              <span className="text-xs font-normal text-slate-400 font-sans">عدد</span>
+            <div className="text-2xl font-extrabold text-white font-mono">
+              {totalDailyImages}{' '}
+              <span className="text-xs font-normal text-slate-300 font-sans">عکس</span>
             </div>
-            <div className="text-[11px] text-slate-400 truncate">
-              {images.filter((i) => !i.isSample).length} عکس کاربر + {images.filter((i) => i.isSample).length} نمونه
+            <div className="text-[11px] text-teal-300/80 truncate">
+              {images.length} عدد سری جاری + {cumulativeCount} عدد بایگانی
             </div>
           </div>
 
           {/* Stat 2: Total Generated Output A4 Pages */}
           <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60 flex flex-col justify-between space-y-1">
             <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span>صفحات A4 تولید شده</span>
+              <span>صفحات A4 سری جاری</span>
               <Layers className="w-4 h-4 text-cyan-400" />
             </div>
             <div className="text-xl font-extrabold text-white font-mono">
@@ -387,7 +391,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
               <span className="text-xs font-normal text-slate-400 font-sans">صفحه</span>
             </div>
             <div className="text-[11px] text-slate-400">
-              ظرفیت کل: {totalPages * itemsPerPage} عکس
+              {completedBatches > 0 ? `${completedBatches} سری قبل بایگانی شد` : `ظرفیت سری: ${totalPages * itemsPerPage} عکس`}
             </div>
           </div>
 
@@ -426,9 +430,9 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
             <span>
-              مجموع تقریبی تمام خروجی‌ها (در ZIP):{' '}
-              <strong className="text-slate-200 font-mono">{estimatedTotalMB} MB</strong>{' '}
-              ({totalPages} فایل با میانگین ~{currentPageSizeKB || 380}KB)
+              کل تصاویر تولیدی امروز: <strong className="text-teal-300 font-bold">{totalDailyImages} عدد</strong>{' '}
+              {completedBatches > 0 && `(طی ${completedBatches + 1} سری)`} • حجم تقریبی ZIP جاری:{' '}
+              <strong className="text-slate-200 font-mono">{estimatedTotalMB} MB</strong>
             </span>
           </div>
           <div className="text-slate-400">

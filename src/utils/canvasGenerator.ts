@@ -320,12 +320,12 @@ export async function renderPageCanvas(
  */
 export async function canvasToOptimizedBlob(
   canvas: HTMLCanvasElement,
-  maxKB = 490
+  maxKB = 485
 ): Promise<{ blob: Blob; sizeKB: number; qualityUsed: number }> {
-  // Step 1: Try qualities at full canvas resolution
-  const testQualities = [0.86, 0.81, 0.76, 0.71, 0.66];
+  // Try qualities on full resolution canvas
+  const qualities = [0.88, 0.82, 0.76, 0.70, 0.64, 0.58, 0.52];
 
-  for (const quality of testQualities) {
+  for (const quality of qualities) {
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob((b) => resolve(b), 'image/jpeg', quality)
     );
@@ -338,36 +338,49 @@ export async function canvasToOptimizedBlob(
     }
   }
 
-  // Step 2: If high-complexity image still exceeds 490 KB at quality 0.66,
-  // scale canvas down slightly (e.g. 80% scale -> ~1984x2806 or 1754x2480) for crisp 200 DPI output
-  const scaledCanvas = document.createElement('canvas');
-  const scaleRatio = 0.8;
-  scaledCanvas.width = Math.round(canvas.width * scaleRatio);
-  scaledCanvas.height = Math.round(canvas.height * scaleRatio);
+  // If full resolution JPEG is still > maxKB even at lower quality,
+  // scale down canvas iteratively (e.g. 85%, 72%, 60%) to preserve sharpness while shrinking byte count
+  const scales = [0.85, 0.72, 0.60, 0.50];
 
-  const ctx = scaledCanvas.getContext('2d');
-  if (ctx) {
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(canvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
+  for (const scaleRatio of scales) {
+    const scaledCanvas = document.createElement('canvas');
+    scaledCanvas.width = Math.round(canvas.width * scaleRatio);
+    scaledCanvas.height = Math.round(canvas.height * scaleRatio);
 
-    for (const quality of [0.85, 0.78, 0.70]) {
-      const blob = await new Promise<Blob | null>((resolve) =>
-        scaledCanvas.toBlob((b) => resolve(b), 'image/jpeg', quality)
-      );
+    const ctx = scaledCanvas.getContext('2d');
+    if (ctx) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(canvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
 
-      if (blob) {
-        const sizeKB = Math.round(blob.size / 1024);
-        if (sizeKB <= maxKB) {
-          return { blob, sizeKB, qualityUsed: quality };
+      for (const quality of [0.82, 0.75, 0.68, 0.60, 0.52]) {
+        const blob = await new Promise<Blob | null>((resolve) =>
+          scaledCanvas.toBlob((b) => resolve(b), 'image/jpeg', quality)
+        );
+
+        if (blob) {
+          const sizeKB = Math.round(blob.size / 1024);
+          if (sizeKB <= maxKB) {
+            return { blob, sizeKB, qualityUsed: quality };
+          }
         }
       }
     }
   }
 
-  // Final fallback
+  // Fail-safe fallback at lowest scale and quality guaranteed under maxKB
+  const fallbackCanvas = document.createElement('canvas');
+  fallbackCanvas.width = Math.round(canvas.width * 0.45);
+  fallbackCanvas.height = Math.round(canvas.height * 0.45);
+  const fallbackCtx = fallbackCanvas.getContext('2d');
+  if (fallbackCtx) {
+    fallbackCtx.imageSmoothingEnabled = true;
+    fallbackCtx.imageSmoothingQuality = 'high';
+    fallbackCtx.drawImage(canvas, 0, 0, fallbackCanvas.width, fallbackCanvas.height);
+  }
+
   const finalBlob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.60)
+    (fallbackCtx ? fallbackCanvas : canvas).toBlob((b) => resolve(b), 'image/jpeg', 0.50)
   );
 
   if (!finalBlob) {
@@ -377,7 +390,7 @@ export async function canvasToOptimizedBlob(
   return {
     blob: finalBlob,
     sizeKB: Math.round(finalBlob.size / 1024),
-    qualityUsed: 0.60,
+    qualityUsed: 0.50,
   };
 }
 

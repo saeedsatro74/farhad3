@@ -74,9 +74,8 @@ export const CustomFreeformCropper: React.FC<CustomFreeformCropperProps> = ({
 
     if (wsWidth <= 0 || wsHeight <= 0) return;
 
-    const isRotatedVertically = (Math.abs(rotation) % 180) !== 0;
-    const imgW = isRotatedVertically ? imgNaturalSize.height : imgNaturalSize.width;
-    const imgH = isRotatedVertically ? imgNaturalSize.width : imgNaturalSize.height;
+    const imgW = imgNaturalSize.width;
+    const imgH = imgNaturalSize.height;
 
     const aspect = imgW / imgH;
     let targetW = wsWidth;
@@ -91,7 +90,7 @@ export const CustomFreeformCropper: React.FC<CustomFreeformCropperProps> = ({
       width: Math.max(40, targetW),
       height: Math.max(40, targetH),
     });
-  }, [imgNaturalSize, rotation]);
+  }, [imgNaturalSize]);
 
   useEffect(() => {
     updateDisplayedSize();
@@ -135,10 +134,16 @@ export const CustomFreeformCropper: React.FC<CustomFreeformCropperProps> = ({
       const container = containerRef.current.getBoundingClientRect();
       if (container.width === 0 || container.height === 0) return;
 
-      const deltaXPercent =
-        ((clientX - dragStartRef.current.mouseX) / container.width) * 100;
-      const deltaYPercent =
-        ((clientY - dragStartRef.current.mouseY) / container.height) * 100;
+      const rawDx = clientX - dragStartRef.current.mouseX;
+      const rawDy = clientY - dragStartRef.current.mouseY;
+
+      // Transform mouse deltas into crop box local coordinate system using rotation
+      const rad = (-rotation * Math.PI) / 180;
+      const localDx = rawDx * Math.cos(rad) - rawDy * Math.sin(rad);
+      const localDy = rawDx * Math.sin(rad) + rawDy * Math.cos(rad);
+
+      const deltaXPercent = (localDx / container.width) * 100;
+      const deltaYPercent = (localDy / container.height) * 100;
 
       const initial = dragStartRef.current.rect;
       const minSize = 2; // minimum 2% width/height
@@ -234,7 +239,7 @@ export const CustomFreeformCropper: React.FC<CustomFreeformCropperProps> = ({
         height: newHeight,
       });
     },
-    [activeHandle, onChangeCropRect]
+    [activeHandle, onChangeCropRect, rotation]
   );
 
   const handleEnd = useCallback(() => {
@@ -258,7 +263,7 @@ export const CustomFreeformCropper: React.FC<CustomFreeformCropperProps> = ({
   }, [activeHandle, handleMove, handleEnd]);
 
   const transformStyle = {
-    transform: `scale(${zoomScale}) rotate(${rotation}deg) scale(${flip.horizontal ? -1 : 1}, ${flip.vertical ? -1 : 1})`,
+    transform: `scale(${zoomScale})`,
     transition: activeHandle ? 'none' : 'transform 0.15s ease-out',
   };
 
@@ -282,6 +287,9 @@ export const CustomFreeformCropper: React.FC<CustomFreeformCropperProps> = ({
             src={imageSrc}
             alt="Cropper target"
             className="w-full h-full object-fill pointer-events-none block rounded-xs"
+            style={{
+              transform: `scale(${flip.horizontal ? -1 : 1}, ${flip.vertical ? -1 : 1})`,
+            }}
           />
 
           {/* Active Crop Box Window */}
@@ -292,6 +300,8 @@ export const CustomFreeformCropper: React.FC<CustomFreeformCropperProps> = ({
               top: `${cropRect.y}%`,
               width: `${cropRect.width}%`,
               height: `${cropRect.height}%`,
+              transform: `rotate(${rotation}deg)`,
+              transformOrigin: 'center center',
               boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.65)',
             }}
             onMouseDown={(e) => handleStart(e, 'move')}

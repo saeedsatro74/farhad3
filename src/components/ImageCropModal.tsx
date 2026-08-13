@@ -60,52 +60,37 @@ async function getCroppedImgFreeform(
   flip = { horizontal: false, vertical: false }
 ): Promise<string> {
   const image = await loadImage(imageSrc);
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
 
-  if (!ctx) throw new Error('No 2d context');
+  // Center of crop box in image pixel coordinates
+  const cx = ((cropRect.x + cropRect.width / 2) / 100) * image.width;
+  const cy = ((cropRect.y + cropRect.height / 2) / 100) * image.height;
 
-  const rotRad = (rotation * Math.PI) / 180;
-  const { width: bBoxWidth, height: bBoxHeight } = rotateSize(
-    image.width,
-    image.height,
-    rotation
-  );
-
-  canvas.width = bBoxWidth;
-  canvas.height = bBoxHeight;
-
-  ctx.translate(bBoxWidth / 2, bBoxHeight / 2);
-  ctx.rotate(rotRad);
-  ctx.scale(flip.horizontal ? -1 : 1, flip.vertical ? -1 : 1);
-  ctx.translate(-image.width / 2, -image.height / 2);
-
-  ctx.drawImage(image, 0, 0);
-
-  const pixelX = (cropRect.x / 100) * bBoxWidth;
-  const pixelY = (cropRect.y / 100) * bBoxHeight;
-  const pixelWidth = (cropRect.width / 100) * bBoxWidth;
-  const pixelHeight = (cropRect.height / 100) * bBoxHeight;
+  // Size of crop box in image pixel coordinates
+  const cropW = (cropRect.width / 100) * image.width;
+  const cropH = (cropRect.height / 100) * image.height;
 
   const croppedCanvas = document.createElement('canvas');
   const croppedCtx = croppedCanvas.getContext('2d');
 
   if (!croppedCtx) throw new Error('No 2d context');
 
-  croppedCanvas.width = Math.max(1, Math.round(pixelWidth));
-  croppedCanvas.height = Math.max(1, Math.round(pixelHeight));
+  const finalW = Math.max(1, Math.round(cropW));
+  const finalH = Math.max(1, Math.round(cropH));
 
-  croppedCtx.drawImage(
-    canvas,
-    pixelX,
-    pixelY,
-    pixelWidth,
-    pixelHeight,
-    0,
-    0,
-    croppedCanvas.width,
-    croppedCanvas.height
-  );
+  croppedCanvas.width = finalW;
+  croppedCanvas.height = finalH;
+
+  // White background fallback
+  croppedCtx.fillStyle = '#FFFFFF';
+  croppedCtx.fillRect(0, 0, finalW, finalH);
+
+  // Sample image with inverse rotation relative to crop box
+  croppedCtx.translate(finalW / 2, finalH / 2);
+  croppedCtx.rotate((-rotation * Math.PI) / 180);
+  croppedCtx.scale(flip.horizontal ? -1 : 1, flip.vertical ? -1 : 1);
+  croppedCtx.translate(-cx, -cy);
+
+  croppedCtx.drawImage(image, 0, 0);
 
   return croppedCanvas.toDataURL('image/jpeg', 0.92);
 }
@@ -472,61 +457,126 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
           {/* Action Buttons Toolbar */}
           <div className="flex flex-wrap items-center justify-between gap-2">
             
-            {/* Rotate and Flip Controls */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <button
-                type="button"
-                onClick={() => setRotation((prev) => (prev - 90) % 360)}
-                className="p-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-teal-700 transition-colors cursor-pointer"
-                title="۹۰ درجه پادساعتگرد"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </button>
+            {/* Rotate, Angle Fine-Tuning and Flip Controls */}
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Fine Rotation Slider & Angle Input */}
+              <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
+                <RotateCw className="w-4 h-4 text-amber-600 shrink-0" />
+                <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">چرخش دقیق:</span>
+                
+                <input
+                  type="range"
+                  min="-180"
+                  max="180"
+                  step="1"
+                  value={rotation}
+                  onChange={(e) => setRotation(parseInt(e.target.value, 10) || 0)}
+                  className="w-20 sm:w-28 accent-amber-500 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
+                  title="زاویه چرخش (از -۱۸۰ تا +۱۸۰ درجه)"
+                />
 
-              <button
-                type="button"
-                onClick={() => setRotation((prev) => (prev + 90) % 360)}
-                className="p-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-teal-700 transition-colors cursor-pointer"
-                title="۹۰ درجه ساعتگرد"
-              >
-                <RotateCw className="w-4 h-4" />
-              </button>
+                <div className="flex items-center gap-0.5 bg-slate-100 rounded-lg px-2 py-0.5 border border-slate-200">
+                  <input
+                    type="number"
+                    value={rotation}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      setRotation(isNaN(val) ? 0 : ((val % 360 + 540) % 360) - 180);
+                    }}
+                    className="w-10 text-center text-xs font-bold font-mono bg-transparent text-slate-800 outline-none"
+                  />
+                  <span className="text-xs font-bold text-slate-500">°</span>
+                </div>
 
-              <button
-                type="button"
-                onClick={() => setFlip((f) => ({ ...f, horizontal: !f.horizontal }))}
-                className={`p-2 rounded-xl border transition-colors cursor-pointer ${
-                  flip.horizontal
-                    ? 'bg-teal-100 border-teal-300 text-teal-800 font-bold'
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
-                title="قرینه‌سازی افقی"
-              >
-                <FlipHorizontal className="w-4 h-4" />
-              </button>
+                {/* Quick Angle Adjustments */}
+                <div className="flex items-center gap-1 border-r border-slate-200 pr-2">
+                  <button
+                    type="button"
+                    onClick={() => setRotation((r) => r - 1)}
+                    className="px-1.5 py-0.5 rounded text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
+                    title="۱ درجه پادساعتگرد"
+                  >
+                    -۱°
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRotation(0)}
+                    className={`px-1.5 py-0.5 rounded text-[11px] font-bold transition-colors cursor-pointer ${
+                      rotation === 0
+                        ? 'bg-amber-500 text-white'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    }`}
+                    title="تراز اولیه (۰ درجه)"
+                  >
+                    ۰°
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRotation((r) => r + 1)}
+                    className="px-1.5 py-0.5 rounded text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
+                    title="۱ درجه ساعتگرد"
+                  >
+                    +۱°
+                  </button>
+                </div>
+              </div>
 
-              <button
-                type="button"
-                onClick={() => setFlip((f) => ({ ...f, vertical: !f.vertical }))}
-                className={`p-2 rounded-xl border transition-colors cursor-pointer ${
-                  flip.vertical
-                    ? 'bg-teal-100 border-teal-300 text-teal-800 font-bold'
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
-                title="قرینه‌سازی عمودی"
-              >
-                <FlipVertical className="w-4 h-4" />
-              </button>
+              {/* 90-degree step buttons */}
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setRotation((prev) => (prev - 90) % 360)}
+                  className="p-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-amber-700 transition-colors cursor-pointer"
+                  title="۹۰ درجه پادساعتگرد"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
 
-              <button
-                type="button"
-                onClick={handleReset}
-                className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-semibold cursor-pointer"
-                title="بازنشانی کادر به حالت اولیه"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                ریست
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setRotation((prev) => (prev + 90) % 360)}
+                  className="p-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-amber-700 transition-colors cursor-pointer"
+                  title="۹۰ درجه ساعتگرد"
+                >
+                  <RotateCw className="w-4 h-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFlip((f) => ({ ...f, horizontal: !f.horizontal }))}
+                  className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                    flip.horizontal
+                      ? 'bg-amber-100 border-amber-300 text-amber-800 font-bold'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                  title="قرینه‌سازی افقی"
+                >
+                  <FlipHorizontal className="w-4 h-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFlip((f) => ({ ...f, vertical: !f.vertical }))}
+                  className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                    flip.vertical
+                      ? 'bg-amber-100 border-amber-300 text-amber-800 font-bold'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                  title="قرینه‌سازی عمودی"
+                >
+                  <FlipVertical className="w-4 h-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-semibold cursor-pointer"
+                  title="بازنشانی کادر و زاویه چرخش به حالت اولیه"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  ریست
+                </button>
+              </div>
             </div>
 
             {/* Modal Actions */}
