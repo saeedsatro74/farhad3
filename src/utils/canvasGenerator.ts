@@ -201,20 +201,23 @@ export async function renderPageCanvas(
     }
   });
 
-  // 4. Grid Cell Borders & Outer Table Frame
-  if (border.borderWidth > 0) {
-    ctx.lineWidth = border.borderWidth;
-    ctx.strokeStyle = border.borderColor || '#000000';
+  // 4. Grid Cell Inner Borders & Outer Frame
+  const totalMarginX = margins.marginLeft + margins.marginRight;
+  const totalMarginY = margins.marginTop + margins.marginBottom;
+  const gridWidth = canvasWidth - totalMarginX;
+  const gridHeight = canvasHeight - totalMarginY;
+  const cols = Math.max(1, page.columns);
+  const rows = Math.max(1, page.rows);
+  const cellWidth = gridWidth / cols;
+  const cellHeight = gridHeight / rows;
 
-    // Draw borders for all grid matrix cells
-    const totalMarginX = margins.marginLeft + margins.marginRight;
-    const totalMarginY = margins.marginTop + margins.marginBottom;
-    const gridWidth = canvasWidth - totalMarginX;
-    const gridHeight = canvasHeight - totalMarginY;
-    const cols = Math.max(1, page.columns);
-    const rows = Math.max(1, page.rows);
-    const cellWidth = gridWidth / cols;
-    const cellHeight = gridHeight / rows;
+  // 4a. Draw Inner Photo Grid Cell Borders (کادر عکس‌های وسط)
+  const innerW = border.innerBorderWidth !== undefined ? border.innerBorderWidth : border.borderWidth;
+  const innerColor = border.innerBorderColor || border.borderColor || '#000000';
+
+  if (innerW > 0) {
+    ctx.lineWidth = innerW;
+    ctx.strokeStyle = innerColor;
 
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
@@ -224,12 +227,19 @@ export async function renderPageCanvas(
       }
     }
 
-    // Re-draw outer border around multi-column images if any
+    // Re-draw inner border around multi-column span images if any
     targetPageLayout.items.forEach((placed) => {
       if (placed.span > 1) {
         ctx.strokeRect(placed.x, placed.y, placed.width, placed.height);
       }
     });
+  }
+
+  // 4b. Draw Outer Border Frame around the entire layout grid (کادر اصلی دور کل مجموعه)
+  if (border.borderWidth > 0) {
+    ctx.lineWidth = border.borderWidth;
+    ctx.strokeStyle = border.borderColor || '#000000';
+    ctx.strokeRect(margins.marginLeft, margins.marginTop, gridWidth, gridHeight);
   }
 
   // Ensure fonts are ready before drawing text on canvas

@@ -30,6 +30,7 @@ interface LivePreviewProps {
   totalDailyImages?: number;
   completedBatches?: number;
   cumulativeCount?: number;
+  cumulativePages?: number;
   onCompleteBatch?: () => void;
   onStartNewProject?: () => void;
 }
@@ -40,6 +41,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
   totalDailyImages = 0,
   completedBatches = 0,
   cumulativeCount = 0,
+  cumulativePages = 0,
   onCompleteBatch,
   onStartNewProject,
 }) => {
@@ -47,6 +49,8 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
 
   const pagesLayout = computePagesLayout(images, settings);
   const totalPages = Math.max(1, pagesLayout.length);
+  const activeBatchPages = images.length > 0 ? totalPages : 0;
+  const totalDailyPages = cumulativePages + activeBatchPages;
   const itemsPerPage = Math.max(1, settings.page.rows * settings.page.columns);
 
   const [currentPage, setCurrentPage] = useState<number>(0);
@@ -380,18 +384,18 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
             </div>
           </div>
 
-          {/* Stat 2: Total Generated Output A4 Pages */}
+          {/* Stat 2: Total Photocalls Generated Today */}
           <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/60 flex flex-col justify-between space-y-1">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span>صفحات A4 سری جاری</span>
+            <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
+              <span>فوتوکل تولیدی امروز</span>
               <Layers className="w-4 h-4 text-cyan-400" />
             </div>
-            <div className="text-xl font-extrabold text-white font-mono">
-              {totalPages}{' '}
-              <span className="text-xs font-normal text-slate-400 font-sans">صفحه</span>
+            <div className="text-2xl font-extrabold text-white font-mono">
+              {totalDailyPages}{' '}
+              <span className="text-xs font-normal text-slate-400 font-sans">فوتوکل</span>
             </div>
-            <div className="text-[11px] text-slate-400">
-              {completedBatches > 0 ? `${completedBatches} سری قبل بایگانی شد` : `ظرفیت سری: ${totalPages * itemsPerPage} عکس`}
+            <div className="text-[11px] text-slate-400 truncate">
+              {totalPages} صفحه سری جاری {cumulativePages > 0 ? `+ ${cumulativePages} صفحه قبل` : ''}
             </div>
           </div>
 

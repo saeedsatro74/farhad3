@@ -18,8 +18,10 @@ export interface MarginConfig {
 }
 
 export interface BorderConfig {
-  borderWidth: number;
-  borderColor: string;
+  borderWidth: number; // ضخامت کادر بیرونی (Outer Border Width)
+  borderColor: string; // رنگ کادر بیرونی (Outer Border Color)
+  innerBorderWidth: number; // ضخامت کادر عکس‌های وسط (Inner Grid Border Width)
+  innerBorderColor: string; // رنگ کادر عکس‌های وسط (Inner Grid Border Color)
 }
 
 export interface NumberingConfig {

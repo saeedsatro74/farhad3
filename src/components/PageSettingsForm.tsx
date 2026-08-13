@@ -124,7 +124,7 @@ export const PageSettingsForm: React.FC<PageSettingsFormProps> = ({
       onChange({
         page: { orientation: 'landscape', rows: 2, columns: 8 },
         margins: { marginTop: 200, marginRight: 100, marginBottom: 100, marginLeft: 100 },
-        border: { borderWidth: 12, borderColor: '#000000' },
+        border: { borderWidth: 12, borderColor: '#000000', innerBorderWidth: 6, innerBorderColor: '#000000' },
         numbering: {
           prefix: 'B',
           fontSize: 60,
@@ -139,7 +139,7 @@ export const PageSettingsForm: React.FC<PageSettingsFormProps> = ({
       onChange({
         page: { orientation: 'landscape', rows: 2, columns: 4 },
         margins: { marginTop: 180, marginRight: 120, marginBottom: 120, marginLeft: 120 },
-        border: { borderWidth: 10, borderColor: '#000000' },
+        border: { borderWidth: 10, borderColor: '#000000', innerBorderWidth: 5, innerBorderColor: '#000000' },
         numbering: {
           prefix: 'A',
           fontSize: 55,
@@ -154,7 +154,7 @@ export const PageSettingsForm: React.FC<PageSettingsFormProps> = ({
       onChange({
         page: { orientation: 'portrait', rows: 3, columns: 3 },
         margins: { marginTop: 150, marginRight: 100, marginBottom: 100, marginLeft: 100 },
-        border: { borderWidth: 8, borderColor: '#1e293b' },
+        border: { borderWidth: 8, borderColor: '#1e293b', innerBorderWidth: 4, innerBorderColor: '#1e293b' },
         numbering: {
           prefix: 'P',
           fontSize: 50,
@@ -378,50 +378,197 @@ export const PageSettingsForm: React.FC<PageSettingsFormProps> = ({
         </div>
       </div>
 
-      {/* 3. IMAGE BORDER SETTINGS */}
-      <div className="space-y-3 pt-2 border-t border-slate-100">
-        <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
-          <Frame className="w-4 h-4 text-teal-600" />
-          <span>تنظیمات کادر تصویر (Outer Border)</span>
+      {/* 3. IMAGE & GRID BORDER SETTINGS */}
+      <div className="space-y-4 pt-2 border-t border-slate-100">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
+            <Frame className="w-4 h-4 text-teal-600" />
+            <span>تنظیمات کادر تصاویر و خطوط (Image & Grid Borders)</span>
+          </div>
+          <span className="text-[11px] text-slate-400">کادر دور + کادر عکس‌های وسط</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">
-              ضخامت کادر بیرونی (Border Width px)
-            </label>
-            <input
-              type="number"
-              min={0}
-              max={50}
-              value={settings.border.borderWidth}
-              onChange={(e) =>
-                updateBorder('borderWidth', parseInt(e.target.value) || 0)
-              }
-              className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-teal-500 font-medium"
-            />
-          </div>
+        {/* DEFAULT COLOR PALETTE PRESETS */}
+        {(() => {
+          const colorPresets = [
+            { name: 'مشکی', hex: '#000000' },
+            { name: 'زغالی', hex: '#1e293b' },
+            { name: 'سفید', hex: '#ffffff' },
+            { name: 'سرمه‌ای', hex: '#1d4ed8' },
+            { name: 'سبز تیره', hex: '#047857' },
+            { name: 'زرشکی', hex: '#b91c1c' },
+            { name: 'طلایی', hex: '#d97706' },
+            { name: 'فیروزه‌ای', hex: '#0d9488' },
+            { name: 'خاکستری', hex: '#64748b' },
+          ];
 
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">
-              رنگ کادر بیرونی (Border Color)
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={settings.border.borderColor}
-                onChange={(e) => updateBorder('borderColor', e.target.value)}
-                className="w-10 h-8 rounded-lg border border-slate-200 cursor-pointer p-0.5 bg-slate-50"
-              />
-              <input
-                type="text"
-                value={settings.border.borderColor}
-                onChange={(e) => updateBorder('borderColor', e.target.value)}
-                className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-800 font-mono focus:outline-hidden focus:ring-2 focus:ring-teal-500"
-              />
+          const currentInnerWidth = settings.border.innerBorderWidth !== undefined ? settings.border.innerBorderWidth : 6;
+          const currentInnerColor = settings.border.innerBorderColor || '#000000';
+
+          return (
+            <div className="space-y-4">
+              {/* --- OUTER BORDER (کادر اصلی دور کل مجموعه) --- */}
+              <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-200/80 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                    کادر دور تصویر (Outer Border)
+                  </span>
+                  <span className="text-[10px] font-medium text-slate-500">قاب اصلی اطراف چیدمان</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                      ضخامت کادر دور (Width px)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={60}
+                      value={settings.border.borderWidth}
+                      onChange={(e) =>
+                        updateBorder('borderWidth', parseInt(e.target.value) || 0)
+                      }
+                      className="w-full text-xs bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-teal-500 font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                      رنگ کادر دور (Border Color)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={settings.border.borderColor || '#000000'}
+                        onChange={(e) => updateBorder('borderColor', e.target.value)}
+                        className="w-9 h-8 rounded-lg border border-slate-200 cursor-pointer p-0.5 bg-white shrink-0"
+                      />
+                      <input
+                        type="text"
+                        value={settings.border.borderColor || '#000000'}
+                        onChange={(e) => updateBorder('borderColor', e.target.value)}
+                        className="flex-1 text-xs bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 font-mono focus:outline-hidden focus:ring-2 focus:ring-teal-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Color Swatches for Outer Border */}
+                <div className="space-y-1 pt-1">
+                  <span className="text-[11px] font-semibold text-slate-600 block">
+                    انتخاب رنگ پیش‌فرض کادر دور:
+                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {colorPresets.map((preset) => {
+                      const isSelected = settings.border.borderColor?.toLowerCase() === preset.hex.toLowerCase();
+                      return (
+                        <button
+                          key={`outer-${preset.hex}`}
+                          type="button"
+                          onClick={() => updateBorder('borderColor', preset.hex)}
+                          className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-medium transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-amber-100 border-amber-500 text-amber-900 font-bold shadow-xs'
+                              : 'bg-white border-slate-200 hover:bg-slate-100 text-slate-700'
+                          }`}
+                          title={`انتخاب رنگ ${preset.name}`}
+                        >
+                          <span
+                            className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0"
+                            style={{ backgroundColor: preset.hex }}
+                          />
+                          <span>{preset.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* --- INNER BORDER (کادر عکس‌های وسط) --- */}
+              <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-200/80 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-teal-500" />
+                    کادر عکس‌های وسط (Inner Photo Borders)
+                  </span>
+                  <span className="text-[10px] font-medium text-slate-500">خطوط جداکننده بین عکس‌ها</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                      ضخامت کادر عکس‌های وسط (Width px)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={60}
+                      value={currentInnerWidth}
+                      onChange={(e) =>
+                        updateBorder('innerBorderWidth', parseInt(e.target.value) || 0)
+                      }
+                      className="w-full text-xs bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-teal-500 font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                      رنگ کادر عکس‌های وسط (Color)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={currentInnerColor}
+                        onChange={(e) => updateBorder('innerBorderColor', e.target.value)}
+                        className="w-9 h-8 rounded-lg border border-slate-200 cursor-pointer p-0.5 bg-white shrink-0"
+                      />
+                      <input
+                        type="text"
+                        value={currentInnerColor}
+                        onChange={(e) => updateBorder('innerBorderColor', e.target.value)}
+                        className="flex-1 text-xs bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 font-mono focus:outline-hidden focus:ring-2 focus:ring-teal-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Color Swatches for Inner Border */}
+                <div className="space-y-1 pt-1">
+                  <span className="text-[11px] font-semibold text-slate-600 block">
+                    انتخاب رنگ پیش‌فرض کادر عکس‌های وسط:
+                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {colorPresets.map((preset) => {
+                      const isSelected = currentInnerColor.toLowerCase() === preset.hex.toLowerCase();
+                      return (
+                        <button
+                          key={`inner-${preset.hex}`}
+                          type="button"
+                          onClick={() => updateBorder('innerBorderColor', preset.hex)}
+                          className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-medium transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-teal-100 border-teal-500 text-teal-900 font-bold shadow-xs'
+                              : 'bg-white border-slate-200 hover:bg-slate-100 text-slate-700'
+                          }`}
+                          title={`انتخاب رنگ ${preset.name}`}
+                        >
+                          <span
+                            className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0"
+                            style={{ backgroundColor: preset.hex }}
+                          />
+                          <span>{preset.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          );
+        })()}
       </div>
 
       {/* 4. NUMBERING SETTINGS */}

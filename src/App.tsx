@@ -24,6 +24,8 @@ const INITIAL_SETTINGS: LayoutSettings = {
   border: {
     borderWidth: 12,
     borderColor: '#000000',
+    innerBorderWidth: 6,
+    innerBorderColor: '#000000',
   },
   numbering: {
     prefix: 'B',
@@ -42,6 +44,7 @@ export default function App() {
 
   // Daily / Session Cumulative Statistics
   const [cumulativeCount, setCumulativeCount] = useState<number>(0);
+  const [cumulativePages, setCumulativePages] = useState<number>(0);
   const [completedBatches, setCompletedBatches] = useState<number>(0);
 
   // Automatically load 16 sample images on first mount so user sees live output immediately
@@ -88,6 +91,7 @@ export default function App() {
         const prevPages = Math.max(1, Math.ceil(prevBatchCount / itemsPerPage));
 
         setCumulativeCount((prev) => prev + prevBatchCount);
+        setCumulativePages((prev) => prev + prevPages);
         setCompletedBatches((prev) => prev + 1);
 
         // Advance start number to continue numbering seamlessly
@@ -152,6 +156,7 @@ export default function App() {
 
     setImages([]);
     setCumulativeCount(0);
+    setCumulativePages(0);
     setCompletedBatches(0);
     setSettings((prev) => ({
       ...prev,
@@ -231,6 +236,7 @@ export default function App() {
     const prevPages = Math.max(1, Math.ceil(prevBatchCount / itemsPerPage));
 
     setCumulativeCount((prev) => prev + prevBatchCount);
+    setCumulativePages((prev) => prev + prevPages);
     setCompletedBatches((prev) => prev + 1);
 
     // Advance start number seamlessly (e.g. B1 -> B2)
@@ -343,6 +349,7 @@ export default function App() {
               totalDailyImages={totalDailyImages}
               completedBatches={completedBatches}
               cumulativeCount={cumulativeCount}
+              cumulativePages={cumulativePages}
               onCompleteBatch={handleCompleteCurrentBatch}
               onStartNewProject={handleStartNewProject}
             />
