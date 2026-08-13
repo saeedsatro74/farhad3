@@ -1,0 +1,6 @@
+{
+  "name": "Farhad Fotoset",
+  "description": "چیدمان هوشمند و حرفه‌ای تصویر روی کاغذ A4 با امکانات کادربندی، کراپ و خروجی باکیفیت و ZIP",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

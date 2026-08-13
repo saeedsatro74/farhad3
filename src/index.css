@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: 'B Titr';
+  src: local('B Titr'), local('BTitr'), local('Titr'),
+       url('https://cdn.jsdelivr.net/gh/rastikerdar/titr-font@master/BTitr.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/rastikerdar/titr-font@master/BTitr.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'B Titr';
+  src: local('B Titr Bold'), local('B Titr'), local('BTitr'), local('Titr'),
+       url('https://cdn.jsdelivr.net/gh/rastikerdar/titr-font@master/BTitr.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/rastikerdar/titr-font@master/BTitr.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-btitr {
+  font-family: 'B Titr', 'BTitr', 'Titr', 'Vazirmatn', sans-serif;
+}
