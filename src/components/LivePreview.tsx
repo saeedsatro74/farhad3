@@ -28,12 +28,16 @@ interface LivePreviewProps {
   settings: LayoutSettings;
   images: ImageItem[];
   totalDailyImages?: number;
+  onCompleteBatch?: () => void;
+  onStartNewProject?: () => void;
 }
 
 export const LivePreview: React.FC<LivePreviewProps> = ({
   settings,
   images,
   totalDailyImages = 0,
+  onCompleteBatch,
+  onStartNewProject,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -45,6 +49,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
   const [isRendering, setIsRendering] = useState<boolean>(false);
   const [isZipping, setIsZipping] = useState<boolean>(false);
   const [currentPageSizeKB, setCurrentPageSizeKB] = useState<number | null>(null);
+  const [downloadSuccess, setDownloadSuccess] = useState<boolean>(false);
 
   const [zipProgress, setZipProgress] = useState<{
     percent: number;
@@ -111,6 +116,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
       a.download = `Page_${currentPage + 1}.jpg`;
       a.click();
       URL.revokeObjectURL(url);
+      setDownloadSuccess(true);
     } catch (e) {
       console.error('Download error', e);
     }
@@ -141,6 +147,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
       a.download = 'images.zip';
       a.click();
       URL.revokeObjectURL(url);
+      setDownloadSuccess(true);
     } catch (e) {
       console.error('ZIP Error', e);
       alert('خطا در تولید فایل فشرده ZIP');
@@ -215,6 +222,41 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
               style={{ width: `${zipProgress.percent}%` }}
             />
           </div>
+        </div>
+      )}
+
+      {/* Download Success / Batch Complete Callout */}
+      {downloadSuccess && images.length > 0 && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 space-y-2 text-xs text-emerald-900 shadow-2xs">
+          <div className="flex items-center justify-between font-bold">
+            <span className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              خروجی این سری با موفقیت دانلود شد!
+            </span>
+            {onStartNewProject && (
+              <button
+                onClick={onStartNewProject}
+                className="text-[11px] font-semibold text-rose-700 hover:text-rose-900 underline cursor-pointer"
+              >
+                شروع پروژه جدید از صفر
+              </button>
+            )}
+          </div>
+          <p className="text-emerald-800 text-[11px] leading-relaxed">
+            جهت پاکسازی پیش‌نمایش و بارگذاری سری بعدی (با شروع شماره متوالی بعدی مثلاً B2)، روی دکمه زیر کلیک کنید:
+          </p>
+          {onCompleteBatch && (
+            <button
+              onClick={() => {
+                onCompleteBatch();
+                setDownloadSuccess(false);
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-all cursor-pointer shadow-2xs"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              تکمیل و بایگانی این سری (آماده‌سازی برای سری بعدی)
+            </button>
+          )}
         </div>
       )}
 

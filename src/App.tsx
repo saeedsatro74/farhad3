@@ -212,7 +212,46 @@ export default function App() {
     );
   };
 
-  // Clear current active batch
+  // Archive current active batch into cumulative total and clear active list & preview, advancing numbering for next batch
+  const handleCompleteCurrentBatch = () => {
+    const isAllSamples = images.length > 0 && images.every((item) => item.isSample);
+
+    if (images.length === 0 || isAllSamples) {
+      images.forEach((item) => {
+        if (item.previewUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(item.previewUrl);
+        }
+      });
+      setImages([]);
+      return;
+    }
+
+    const prevBatchCount = images.length;
+    const itemsPerPage = Math.max(1, settings.page.rows * settings.page.columns);
+    const prevPages = Math.max(1, Math.ceil(prevBatchCount / itemsPerPage));
+
+    setCumulativeCount((prev) => prev + prevBatchCount);
+    setCompletedBatches((prev) => prev + 1);
+
+    // Advance start number seamlessly (e.g. B1 -> B2)
+    setSettings((current) => ({
+      ...current,
+      numbering: {
+        ...current.numbering,
+        startNumber: current.numbering.startNumber + prevPages,
+      },
+    }));
+
+    // Clear current images from state & preview
+    images.forEach((item) => {
+      if (item.previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(item.previewUrl);
+      }
+    });
+    setImages([]);
+  };
+
+  // Clear current active batch without archiving
   const handleClearCurrentBatch = () => {
     images.forEach((item) => {
       if (item.previewUrl.startsWith('blob:')) {
@@ -271,6 +310,7 @@ export default function App() {
             startNumber={settings.numbering.startNumber}
             prefix={settings.numbering.prefix}
             onAddImages={handleAddImages}
+            onCompleteBatch={handleCompleteCurrentBatch}
             onStartNewProject={handleStartNewProject}
             onRemoveImage={handleRemoveImage}
             onReorderImage={handleReorderImage}
@@ -301,6 +341,8 @@ export default function App() {
               settings={settings}
               images={images}
               totalDailyImages={totalDailyImages}
+              onCompleteBatch={handleCompleteCurrentBatch}
+              onStartNewProject={handleStartNewProject}
             />
           </div>
         </div>

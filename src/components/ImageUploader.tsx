@@ -25,6 +25,7 @@ interface ImageUploaderProps {
   startNumber: number;
   prefix: string;
   onAddImages: (files: FileList | File[], mode: 'append' | 'new_batch') => void;
+  onCompleteBatch?: () => void;
   onStartNewProject: () => void;
   onRemoveImage: (id: string) => void;
   onReorderImage: (fromIndex: number, toIndex: number) => void;
@@ -42,6 +43,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   startNumber,
   prefix,
   onAddImages,
+  onCompleteBatch,
   onStartNewProject,
   onRemoveImage,
   onReorderImage,
@@ -131,29 +133,39 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
         {/* Action Toolbars */}
         <div className="flex flex-wrap items-center gap-2">
+          {images.length > 0 && !isSampleList && onCompleteBatch && (
+            <button
+              type="button"
+              onClick={onCompleteBatch}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-3.5 py-2 rounded-xl transition-all shadow-2xs cursor-pointer"
+              title="ثبت این سری و حذف از پیش‌نمایش جهت آماده‌سازی برای بارگذاری سری بعدی (شماره‌گذاری به طور متوالی حفظ می‌شود)"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
+              تکمیل این سری (ثبت آمار و پاکسازی پیش‌نمایش)
+            </button>
+          )}
+
           {images.length > 0 && !isSampleList && (
             <button
               type="button"
               onClick={() => newBatchInputRef.current?.click()}
               className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 px-3.5 py-2 rounded-xl shadow-xs transition-all transform active:scale-95 cursor-pointer"
-              title="بارگذاری سری جدید تصاویر (سری قبلی در آمار کل ثبت می‌شود و شماره‌گذاری ادامه می‌یابد)"
+              title="بارگذاری مستقیم سری جدید تصاویر (سری قبلی در آمار ثبت شده و شماره‌گذاری ادامه می‌یابد)"
             >
               <FolderPlus className="w-4 h-4 text-emerald-200" />
-              ➕ بارگذاری سری جدید ({images.length} عکس بعدی)
+              ➕ بارگذاری سری جدید
             </button>
           )}
 
-          {images.length > 0 && (
-            <button
-              type="button"
-              onClick={onStartNewProject}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-2 rounded-xl border border-rose-200 transition-colors cursor-pointer"
-              title="شروع پروژه جدید از صفر و پاکسازی تمامی آمار روزانه"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-              پروژه جدید (صفر کردن آمار)
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={onStartNewProject}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-2 rounded-xl border border-rose-200 transition-colors cursor-pointer"
+            title="شروع پروژه جدید از صفر و پاکسازی تمامی آمار روزانه"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+            حذف پروژه (صفر کردن آمار)
+          </button>
         </div>
       </div>
 
