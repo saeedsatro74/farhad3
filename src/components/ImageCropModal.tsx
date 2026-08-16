@@ -61,38 +61,58 @@ async function getCroppedImgFreeform(
 ): Promise<string> {
   const image = await loadImage(imageSrc);
 
-  // Center of crop box in image pixel coordinates
-  const cx = ((cropRect.x + cropRect.width / 2) / 100) * image.width;
-  const cy = ((cropRect.y + cropRect.height / 2) / 100) * image.height;
+  const rotRad = (rotation * Math.PI) / 180;
+  const bBoxWidth =
+    Math.abs(Math.cos(rotRad) * image.width) +
+    Math.abs(Math.sin(rotRad) * image.height);
+  const bBoxHeight =
+    Math.abs(Math.sin(rotRad) * image.width) +
+    Math.abs(Math.cos(rotRad) * image.height);
 
-  // Size of crop box in image pixel coordinates
-  const cropW = (cropRect.width / 100) * image.width;
-  const cropH = (cropRect.height / 100) * image.height;
+  // 1. Create full rotated & flipped canvas at high resolution
+  const rotCanvas = document.createElement('canvas');
+  rotCanvas.width = Math.max(1, Math.round(bBoxWidth));
+  rotCanvas.height = Math.max(1, Math.round(bBoxHeight));
+  const rotCtx = rotCanvas.getContext('2d');
+  if (!rotCtx) throw new Error('No 2d context');
+
+  // Fill with white background
+  rotCtx.fillStyle = '#FFFFFF';
+  rotCtx.fillRect(0, 0, rotCanvas.width, rotCanvas.height);
+
+  rotCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
+  rotCtx.rotate(rotRad);
+  rotCtx.scale(flip.horizontal ? -1 : 1, flip.vertical ? -1 : 1);
+  rotCtx.drawImage(image, -image.width / 2, -image.height / 2, image.width, image.height);
+
+  // 2. Extract the cropped portion from the rotated canvas based on cropRect percentages
+  const pixelX = Math.round((cropRect.x / 100) * rotCanvas.width);
+  const pixelY = Math.round((cropRect.y / 100) * rotCanvas.height);
+  const pixelWidth = Math.max(1, Math.round((cropRect.width / 100) * rotCanvas.width));
+  const pixelHeight = Math.max(1, Math.round((cropRect.height / 100) * rotCanvas.height));
 
   const croppedCanvas = document.createElement('canvas');
+  croppedCanvas.width = pixelWidth;
+  croppedCanvas.height = pixelHeight;
   const croppedCtx = croppedCanvas.getContext('2d');
-
   if (!croppedCtx) throw new Error('No 2d context');
 
-  const finalW = Math.max(1, Math.round(cropW));
-  const finalH = Math.max(1, Math.round(cropH));
-
-  croppedCanvas.width = finalW;
-  croppedCanvas.height = finalH;
-
-  // White background fallback
   croppedCtx.fillStyle = '#FFFFFF';
-  croppedCtx.fillRect(0, 0, finalW, finalH);
+  croppedCtx.fillRect(0, 0, pixelWidth, pixelHeight);
 
-  // Sample image with inverse rotation relative to crop box
-  croppedCtx.translate(finalW / 2, finalH / 2);
-  croppedCtx.rotate((-rotation * Math.PI) / 180);
-  croppedCtx.scale(flip.horizontal ? -1 : 1, flip.vertical ? -1 : 1);
-  croppedCtx.translate(-cx, -cy);
+  croppedCtx.drawImage(
+    rotCanvas,
+    pixelX,
+    pixelY,
+    pixelWidth,
+    pixelHeight,
+    0,
+    0,
+    pixelWidth,
+    pixelHeight
+  );
 
-  croppedCtx.drawImage(image, 0, 0);
-
-  return croppedCanvas.toDataURL('image/jpeg', 0.92);
+  return croppedCanvas.toDataURL('image/jpeg', 0.95);
 }
 
 export const ImageCropModal: React.FC<ImageCropModalProps> = ({

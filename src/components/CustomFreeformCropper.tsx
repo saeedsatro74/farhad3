@@ -38,9 +38,15 @@ export const CustomFreeformCropper: React.FC<CustomFreeformCropperProps> = ({
 }) => {
   const workspaceRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  const [imgElement, setImgElement] = useState<HTMLImageElement | null>(null);
   const [imgNaturalSize, setImgNaturalSize] = useState<{ width: number; height: number } | null>(null);
-  const [displayedSize, setDisplayedSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const [displayedMetrics, setDisplayedMetrics] = useState<{
+    width: number;
+    height: number;
+    scale: number;
+  }>({ width: 0, height: 0, scale: 1 });
 
   const [activeHandle, setActiveHandle] = useState<HandleType>(null);
   const dragStartRef = useRef<{
@@ -49,12 +55,14 @@ export const CustomFreeformCropper: React.FC<CustomFreeformCropperProps> = ({
     rect: CropRect;
   } | null>(null);
 
-  // Load natural image size
+  // Load natural image
   useEffect(() => {
     let isMounted = true;
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     img.onload = () => {
       if (isMounted) {
+        setImgElement(img);
         setImgNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
       }
     };
@@ -64,46 +72,90 @@ export const CustomFreeformCropper: React.FC<CustomFreeformCropperProps> = ({
     };
   }, [imageSrc]);
 
-  // Recalculate displayed size to fit exact image aspect ratio inside workspace
-  const updateDisplayedSize = useCallback(() => {
+  // Calculate container dimensions and uniform scale factor
+  const updateMetrics = useCallback(() => {
     if (!workspaceRef.current || !imgNaturalSize) return;
 
     const padding = 32;
-    const wsWidth = workspaceRef.current.clientWidth - padding;
-    const wsHeight = workspaceRef.current.clientHeight - padding;
+    const wsWidth = Math.max(40, workspaceRef.current.clientWidth - padding);
+    const wsHeight = Math.max(40, workspaceRef.current.clientHeight - padding);
 
-    if (wsWidth <= 0 || wsHeight <= 0) return;
+    const rotRad = (rotation * Math.PI) / 180;
+    const bBoxW =
+      Math.abs(Math.cos(rotRad) * imgNaturalSize.width) +
+      Math.abs(Math.sin(rotRad) * imgNaturalSize.height);
+    const bBoxH =
+      Math.abs(Math.sin(rotRad) * imgNaturalSize.width) +
+      Math.abs(Math.cos(rotRad) * imgNaturalSize.height);
 
-    const imgW = imgNaturalSize.width;
-    const imgH = imgNaturalSize.height;
+    if (bBoxW <= 0 || bBoxH <= 0) return;
 
-    const aspect = imgW / imgH;
-    let targetW = wsWidth;
-    let targetH = wsWidth / aspect;
+    // Uniform scale to fit perfectly inside the workspace without distortion
+    const scale = Math.min(wsWidth / bBoxW, wsHeight / bBoxH);
 
-    if (targetH > wsHeight) {
-      targetH = wsHeight;
-      targetW = wsHeight * aspect;
-    }
+    const targetW = Math.max(40, Math.round(bBoxW * scale));
+    const targetH = Math.max(40, Math.round(bBoxH * scale));
 
-    setDisplayedSize({
-      width: Math.max(40, targetW),
-      height: Math.max(40, targetH),
+    setDisplayedMetrics({
+      width: targetW,
+      height: targetH,
+      scale,
     });
-  }, [imgNaturalSize]);
+  }, [imgNaturalSize, rotation]);
 
   useEffect(() => {
-    updateDisplayedSize();
-  }, [updateDisplayedSize]);
+    updateMetrics();
+  }, [updateMetrics]);
 
   useEffect(() => {
     if (!workspaceRef.current) return;
     const observer = new ResizeObserver(() => {
-      updateDisplayedSize();
+      updateMetrics();
     });
     observer.observe(workspaceRef.current);
     return () => observer.disconnect();
-  }, [updateDisplayedSize]);
+  }, [updateMetrics]);
+
+  // Render rotated and flipped image on preview canvas with strictly preserved aspect ratio
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (
+      !canvas ||
+      !imgElement ||
+      !imgNaturalSize ||
+      displayedMetrics.width <= 0 ||
+      displayedMetrics.height <= 0
+    ) {
+      return;
+    }
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    canvas.width = Math.round(displayedMetrics.width * dpr);
+    canvas.height = Math.round(displayedMetrics.height * dpr);
+
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    // Fill background
+    ctx.fillStyle = '#020617'; // slate-950
+    ctx.fillRect(0, 0, displayedMetrics.width, displayedMetrics.height);
+
+    const rotRad = (rotation * Math.PI) / 180;
+
+    // Calculate exact drawn dimensions preserving original natural aspect ratio
+    const drawW = imgNaturalSize.width * displayedMetrics.scale;
+    const drawH = imgNaturalSize.height * displayedMetrics.scale;
+
+    ctx.translate(displayedMetrics.width / 2, displayedMetrics.height / 2);
+    ctx.rotate(rotRad);
+    ctx.scale(flip.horizontal ? -1 : 1, flip.vertical ? -1 : 1);
+    ctx.drawImage(imgElement, -drawW / 2, -drawH / 2, drawW, drawH);
+
+    ctx.restore();
+  }, [imgElement, imgNaturalSize, displayedMetrics, rotation, flip]);
 
   const handleStart = (
     e: React.MouseEvent | React.TouchEvent,
@@ -134,16 +186,10 @@ export const CustomFreeformCropper: React.FC<CustomFreeformCropperProps> = ({
       const container = containerRef.current.getBoundingClientRect();
       if (container.width === 0 || container.height === 0) return;
 
-      const rawDx = clientX - dragStartRef.current.mouseX;
-      const rawDy = clientY - dragStartRef.current.mouseY;
-
-      // Transform mouse deltas into crop box local coordinate system using rotation
-      const rad = (-rotation * Math.PI) / 180;
-      const localDx = rawDx * Math.cos(rad) - rawDy * Math.sin(rad);
-      const localDy = rawDx * Math.sin(rad) + rawDy * Math.cos(rad);
-
-      const deltaXPercent = (localDx / container.width) * 100;
-      const deltaYPercent = (localDy / container.height) * 100;
+      const deltaXPercent =
+        ((clientX - dragStartRef.current.mouseX) / container.width) * 100;
+      const deltaYPercent =
+        ((clientY - dragStartRef.current.mouseY) / container.height) * 100;
 
       const initial = dragStartRef.current.rect;
       const minSize = 2; // minimum 2% width/height
@@ -239,7 +285,7 @@ export const CustomFreeformCropper: React.FC<CustomFreeformCropperProps> = ({
         height: newHeight,
       });
     },
-    [activeHandle, onChangeCropRect, rotation]
+    [activeHandle, onChangeCropRect]
   );
 
   const handleEnd = useCallback(() => {
@@ -272,23 +318,23 @@ export const CustomFreeformCropper: React.FC<CustomFreeformCropperProps> = ({
       ref={workspaceRef}
       className="relative w-full h-full min-h-0 min-w-0 flex items-center justify-center p-4 bg-slate-950 select-none overflow-hidden"
     >
-      {displayedSize.width > 0 && displayedSize.height > 0 && (
+      {displayedMetrics.width > 0 && displayedMetrics.height > 0 && (
         <div
           ref={containerRef}
           className="relative shadow-2xl transition-transform duration-100 shrink-0"
           style={{
-            width: `${displayedSize.width}px`,
-            height: `${displayedSize.height}px`,
+            width: `${displayedMetrics.width}px`,
+            height: `${displayedMetrics.height}px`,
             ...transformStyle,
           }}
         >
-          {/* Base Image */}
-          <img
-            src={imageSrc}
-            alt="Cropper target"
-            className="w-full h-full object-fill pointer-events-none block rounded-xs"
+          {/* Base Rotated & Flipped Image Canvas */}
+          <canvas
+            ref={canvasRef}
+            className="w-full h-full block rounded-xs pointer-events-none"
             style={{
-              transform: `scale(${flip.horizontal ? -1 : 1}, ${flip.vertical ? -1 : 1})`,
+              width: `${displayedMetrics.width}px`,
+              height: `${displayedMetrics.height}px`,
             }}
           />
 
@@ -300,8 +346,6 @@ export const CustomFreeformCropper: React.FC<CustomFreeformCropperProps> = ({
               top: `${cropRect.y}%`,
               width: `${cropRect.width}%`,
               height: `${cropRect.height}%`,
-              transform: `rotate(${rotation}deg)`,
-              transformOrigin: 'center center',
               boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.65)',
             }}
             onMouseDown={(e) => handleStart(e, 'move')}
@@ -315,8 +359,8 @@ export const CustomFreeformCropper: React.FC<CustomFreeformCropperProps> = ({
               <div className="border-r border-b border-white/60" />
               <div className="border-r border-b border-white/60" />
               <div className="border-b border-white/60" />
-              <div className="border-r border-white/60" />
-              <div className="border-r border-white/60" />
+              <div className="border-r border-b border-white/60" />
+              <div className="border-r border-b border-white/60" />
               <div />
             </div>
 
