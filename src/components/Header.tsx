@@ -1,5 +1,6 @@
 import React from 'react';
-import { Camera, Sparkles, RefreshCw, Film, Trash2, Layers } from 'lucide-react';
+import { Camera, Sparkles, RefreshCw, Film, Trash2, Layers, LogOut, UserCheck } from 'lucide-react';
+import { AuthUser } from '../types';
 
 interface HeaderProps {
   onReset: () => void;
@@ -8,6 +9,8 @@ interface HeaderProps {
   hasImages: boolean;
   totalDailyImages: number;
   completedBatches: number;
+  currentUser?: AuthUser | null;
+  onLogout?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -17,6 +20,8 @@ export const Header: React.FC<HeaderProps> = ({
   hasImages,
   totalDailyImages,
   completedBatches,
+  currentUser,
+  onLogout,
 }) => {
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
@@ -55,7 +60,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Action Controls & Daily Stats */}
+        {/* Action Controls & Daily Stats & User Profile */}
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
           
           {/* Daily Cumulative Stats Counter */}
@@ -94,11 +99,41 @@ export const Header: React.FC<HeaderProps> = ({
             title="حذف و صفر کردن آمار روزانه جهت شروع پروژه جدید"
           >
             <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-            پروژه جدید (صفر کردن)
+            پروژه جدید
           </button>
+
+          {/* Logged in User Badge & Logout */}
+          {currentUser && (
+            <div className="flex items-center gap-1.5 bg-slate-100/90 pl-1.5 pr-2.5 py-1 rounded-xl border border-slate-200/80 shadow-2xs">
+              <div className="flex items-center gap-1.5">
+                <div className="w-6 h-6 rounded-lg bg-teal-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                  <UserCheck className="w-3.5 h-3.5" />
+                </div>
+                <div className="flex flex-col text-right">
+                  <span className="text-[11px] font-bold text-slate-800 leading-tight">
+                    {currentUser.fullName}
+                  </span>
+                  <span className="text-[9px] text-teal-700 font-medium">
+                    {currentUser.role}
+                  </span>
+                </div>
+              </div>
+
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  className="mr-1.5 p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                  title="خروج از حساب کاربری"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </header>
   );
 };
+
 

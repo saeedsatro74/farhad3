@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutSettings, ImageItem, CropSettings } from './types';
+import { LayoutSettings, ImageItem, CropSettings, AuthUser } from './types';
 import { Header } from './components/Header';
+import { LoginPage } from './components/LoginPage';
 import { PageSettingsForm } from './components/PageSettingsForm';
 import { ImageUploader } from './components/ImageUploader';
 import { LivePreview } from './components/LivePreview';
@@ -38,14 +39,53 @@ const INITIAL_SETTINGS: LayoutSettings = {
   },
 };
 
+const AUTH_STORAGE_KEY = 'farhad_fotoset_auth_user';
+
 export default function App() {
   const [settings, setSettings] = useState<LayoutSettings>(INITIAL_SETTINGS);
   const [images, setImages] = useState<ImageItem[]>([]);
+
+  // Authentication State
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
+    try {
+      const saved = localStorage.getItem(AUTH_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const handleLogin = (user: AuthUser, rememberMe: boolean) => {
+    setCurrentUser(user);
+    if (rememberMe) {
+      try {
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+      } catch (e) {
+        console.error('Failed to save auth to localStorage', e);
+      }
+    } else {
+      try {
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+      } catch (e) {
+        console.error('Failed to remove auth', e);
+      }
+    }
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    try {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+    } catch (e) {
+      console.error('Failed to remove auth', e);
+    }
+  };
 
   // Daily / Session Cumulative Statistics
   const [cumulativeCount, setCumulativeCount] = useState<number>(0);
   const [cumulativePages, setCumulativePages] = useState<number>(0);
   const [completedBatches, setCompletedBatches] = useState<number>(0);
+
 
   // Automatically load 16 sample images on first mount so user sees live output immediately
   useEffect(() => {
@@ -291,6 +331,11 @@ export default function App() {
   const isAllSamples = images.length > 0 && images.every((item) => item.isSample);
   const totalDailyImages = cumulativeCount + (isAllSamples ? 0 : images.length);
 
+  // If user is not authenticated, show the Login Page
+  if (!currentUser) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-['Vazirmatn',tahoma,sans-serif]" dir="rtl">
       {/* Top Navbar */}
@@ -301,7 +346,10 @@ export default function App() {
         hasImages={images.length > 0}
         totalDailyImages={totalDailyImages}
         completedBatches={completedBatches}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
+
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">

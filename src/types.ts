@@ -64,3 +64,13 @@ export interface GeneratedPageResult {
   dataUrl: string;
   blob: Blob;
 }
+
+export interface AuthUser {
+  id: string;
+  username: string;
+  fullName: string;
+  role: string;
+  avatar?: string;
+  lastLogin?: string;
+}
+
